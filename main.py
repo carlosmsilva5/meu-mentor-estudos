@@ -25,6 +25,18 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ---------------- FUNÇÕES ----------------
+def save_data(sheet, df_new):
+    try:
+        # Carrega o que já existe na planilha
+        df_atual = conn.read(worksheet=sheet).dropna(how='all')
+        # Junta com o novo registro
+        df_novo = pd.concat([df_atual, df_new], ignore_index=True)
+        # Atualiza a planilha no Google Sheets
+        conn.update(worksheet=sheet, data=df_novo)
+        st.cache_data.clear()
+    except Exception as e:
+        st.error(f"Erro ao salvar dados: {e}")
+
 def formatar_tempo(minutos):
     if pd.isna(minutos) or minutos < 0: return "0min"
     if minutos < 60: return f"{int(minutos)}min"
