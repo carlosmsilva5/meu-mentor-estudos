@@ -227,23 +227,28 @@ if page == "Home":
 elif page == "Registrar Estudo":
     st.title("📝 Registrar Nova Sessão")
     
-    # GARANTIA: Recarregar as matérias caso a variável tenha se perdido
+    # 1. Tenta garantir que df_materias esteja disponível
+    # Se o seu script carrega as matérias no início como 'df_materias', use-a aqui:
     if 'df_materias' not in locals() and 'df_materias' not in globals():
+        # Caso a variável global falhe, tentamos ler novamente
         try:
-            from streamlit_gsheets import GSheetsConnection
-            conn = st.connection("gsheets", type=GSheetsConnection)
             df_materias = conn.read(worksheet="materias")
         except:
             df_materias = pd.DataFrame(columns=["materia"])
 
-    # FORMULÁRIO DE REGISTRO
-    with st.form("form_registro_v2", clear_on_submit=True):
+    # 2. Início do Formulário
+    with st.form("form_registro_v3", clear_on_submit=True):
         col1, col2 = st.columns(2)
         with col1:
             data_estudo = st.date_input("Data", pd.Timestamp.today())
-            # Verifica se df_materias existe e não está vazio
-            lista_materias = df_materias['materia'].tolist() if not df_materias.empty else ["Nenhuma Matéria Cadastrada"]
-            materia_selecionada = st.selectbox("Matéria", lista_materias)
+            
+            # BUSCA REAL: Pega a coluna 'materia' do seu DataFrame de matérias cadastradas
+            if not df_materias.empty and 'materia' in df_materias.columns:
+                lista_materias = df_materias['materia'].unique().tolist()
+            else:
+                lista_materias = ["Nenhuma Matéria Cadastrada"]
+                
+            materia_selecionada = st.selectbox("Selecione a Matéria", lista_materias)
         
         with col2:
             tipo_estudo = st.radio("Tipo de Estudo", ["Teoria", "Questões", "Revisão"], horizontal=True)
@@ -251,54 +256,59 @@ elif page == "Registrar Estudo":
 
         st.divider()
         
-        col_t1, col_t2 = st.columns([1, 2])
-        with col_t1:
-            tempo_input = st.number_input("Minutos Estudados", min_value=0, step=5)
-        with col_t2:
-            st.info("💡 Insira o tempo total cronometrado.")
+        # --- SEÇÃO DE PÁGINAS (Cálculo Automático) ---
+        st.subheader("📖 Progresso na Leitura")
+        c_p1, c_p2, c_p3 = st.columns(3)
+        with c_p1:
+            p_ini = st.number_input("Página Inicial", min_value=0, value=0)
+        with c_p2:
+            p_fim = st.number_input("Página Final", min_value=0, value=0)
+        with c_p3:
+            # Cálculo visual apenas para conferência
+            total_p_lidas = p_fim - p_ini if p_fim >= p_ini else 0
+            st.metric("Total Páginas", total_p_lidas)
 
         st.divider()
 
-        col_p1, col_p2, col_q1, col_q2 = st.columns(4)
-        with col_p1:
-            p_ini = st.number_input("Pág. Inicial", min_value=0, value=0)
-        with col_p2:
-            p_fim = st.number_input("Pág. Final", min_value=0, value=0)
+        # --- TEMPO E QUESTÕES ---
+        col_t, col_q1, col_q2 = st.columns(3)
+        with col_t:
+            tempo_input = st.number_input("Minutos Estudados", min_value=0, step=5)
         with col_q1:
             t_quest = st.number_input("Total Questões", min_value=0, value=0)
         with col_q2:
             t_acer = st.number_input("Acertos", min_value=0, value=0)
 
-        obs = st.text_area("Notas da sessão")
+        obs = st.text_area("Notas da sessão (opcional)")
         
-        # O BOTÃO PRECISA ESTAR DENTRO DO 'WITH ST.FORM'
-        btn_salvar = st.form_submit_button("Confirmar e Gravar Estudo", use_container_width=True)
+        # Botão de envio OBRIGATÓRIO dentro do form
+        btn_salvar = st.form_submit_button("Gravar Sessão no Histórico", use_container_width=True)
         
-    # LÓGICA DE SALVAMENTO (FORA DO FORM MAS APÓS O CLIQUE)
+    # 3. Lógica após o clique (fora do form)
     if btn_salvar:
         if materia_selecionada == "Nenhuma Matéria Cadastrada":
-            st.error("Cadastre uma matéria na aba 'Gestão de Dados' antes de registrar!")
+            st.warning("⚠️ Você precisa cadastrar matérias primeiro na aba 'Gestão de Dados'.")
         else:
             calc_paginas = p_fim - p_ini if p_fim >= p_ini else 0
             
-            nova_linha = {
+            nova_sessao = {
                 "data": data_estudo.strftime('%d/%m/%Y'),
                 "materia": materia_selecionada,
                 "tipo_estudo": tipo_estudo,
-                "tempo": tempo_input,
-                "acertos": t_acer,
-                "total_q": t_quest,
-                "paginas": calc_paginas,
+                "tempo": int(tempo_input),
+                "acertos": int(t_acer),
+                "total_q": int(t_quest),
+                "paginas": int(calc_paginas),
                 "humor": humor,
                 "obs": obs
             }
             
             try:
-                append_data("progresso", nova_linha)
-                st.success(f"Registrado: {materia_selecionada} | {tempo_input}min | {calc_paginas} pág(s).")
+                append_data("progresso", nova_sessao)
+                st.success(f"✅ Salvo com sucesso! {materia_selecionada}: {tempo_input}min e {calc_paginas} páginas.")
                 st.balloons()
             except Exception as e:
-                st.error(f"Erro ao salvar na planilha: {e}")
+                st.error(f"Erro ao salvar: {e}")
 
 elif page == "Caderno de Erros":
     st.title("❌ Caderno de Erros Estratégico")
