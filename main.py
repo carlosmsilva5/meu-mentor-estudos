@@ -275,8 +275,12 @@ elif page == "Gestão de Dados":
                 st.rerun()
                 
     with t4:
+        st.markdown("### Editar Caderno de Erros")
         if not df_erros.empty:
             ed_err = st.data_editor(df_erros, num_rows="dynamic", key="ed_err", use_container_width=True)
-            if st.button("Salvar Alterações de Erros"):
+            if st.button("Salvar Alterações de Erros", type="primary"):
                 overwrite_data("caderno_erros", ed_err)
+                st.success("Erros atualizados!")
                 st.rerun()
+        else:
+            st.warning("O seu caderno de erros está vazio no momento. Registre novos erros na aba 'Caderno de Erros'.")
