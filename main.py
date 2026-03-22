@@ -14,10 +14,12 @@ st.markdown("""
     <style>
     .stApp { background-color: #0D1117; color: #C9D1D9; }
     .metric-card { background-color: #161B22; padding: 15px; border-radius: 8px; border: 1px solid #30363D; }
-    .metric-title { color: #8B949E; font-size: 12px; font-weight: bold; }
-    .metric-value { color: #F0F6FC; font-size: 22px; font-weight: bold; }
-    .timer-digital { font-family: 'Courier New', monospace; font-size: 50px; color: #39D353; text-align: center; background: #000; border-radius: 10px; padding: 10px; border: 1px solid #30363D; text-shadow: 0 0 10px #26A641; }
-    .card-erro { background-color: #161B22; padding: 12px; border-radius: 8px; border-left: 4px solid #F85149; margin-bottom: 8px; border-top: 1px solid #30363D; border-right: 1px solid #30363D; border-bottom: 1px solid #30363D; }
+    .metric-title { color: #8B949E; font-size: 11px; font-weight: bold; letter-spacing: 1px; }
+    .metric-value { color: #F0F6FC; font-size: 20px; font-weight: bold; margin-top: 5px; }
+    .timer-digital { font-family: 'Courier New', monospace; font-size: 45px; color: #39D353; text-align: center; background: #000; border-radius: 10px; padding: 10px; border: 1px solid #30363D; text-shadow: 0 0 8px #26A641; margin-bottom: 15px; }
+    .card-erro { background-color: #161B22; padding: 12px; border-radius: 8px; border-left: 4px solid #F85149; margin-bottom: 8px; border: 1px solid #30363D; }
+    /* Remove interatividade do Plotly */
+    .js-plotly-plot .plotly .cursor-crosshair { cursor: default !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -41,120 +43,109 @@ df_erros = carregar_dados("caderno_erros")
 concurso = df_config["concurso"].iloc[0] if not df_config.empty else "Objetivo: Federal"
 materias_list = str(df_config["materias"].iloc[0]).split(",") if not df_config.empty else ["Português"]
 
-# --- TABS PRINCIPAIS ---
-tab_home, tab_erros, tab_config = st.tabs(["🏠 Dashboard Principal", "📓 Caderno de Erros", "⚙️ Config"])
+tab_home, tab_erros, tab_config = st.tabs(["🏠 Dashboard", "📓 Erros", "⚙️ Config"])
 
-# --- TAB HOME (LAYOUT SOLICITADO) ---
+# --- TAB HOME ---
 with tab_home:
-    # 1. MÉTRICAS NO TOPO
+    # 1. CARDS DE MÉTRICAS
     m1, m2, m3, m4 = st.columns(4)
     with m1:
-        total_m = df_p['tempo'].sum() if not df_p.empty else 0
-        st.markdown(f'<div class="metric-card"><div class="metric-title">TEMPO TOTAL</div><div class="metric-value">{int(total_m//60)}h {int(total_m%60)}min</div></div>', unsafe_allow_html=True)
+        tm = df_p['tempo'].sum() if not df_p.empty else 0
+        st.markdown(f'<div class="metric-card"><div class="metric-title">TOTAL ESTUDADO</div><div class="metric-value">{int(tm//60)}h {int(tm%60)}min</div></div>', unsafe_allow_html=True)
     with m2:
         acc = (df_p['acertos'].sum() / df_p['total_q'].sum() * 100) if not df_p.empty and df_p['total_q'].sum() > 0 else 0
         st.markdown(f'<div class="metric-card"><div class="metric-title">APROVEITAMENTO</div><div class="metric-value">{acc:.1f}%</div></div>', unsafe_allow_html=True)
     with m3:
-        pags = df_p['paginas'].sum() if not df_p.empty else 0
-        st.markdown(f'<div class="metric-card"><div class="metric-title">PÁGINAS LIDAS</div><div class="metric-value">{int(pags)}</div></div>', unsafe_allow_html=True)
+        erros_count = len(df_erros) if not df_erros.empty else 0
+        st.markdown(f'<div class="metric-card"><div class="metric-title">QUESTÕES NO CADERNO</div><div class="metric-value">{erros_count}</div></div>', unsafe_allow_html=True)
     with m4:
-        st.markdown(f'<div class="metric-card"><div class="metric-title">STATUS</div><div class="metric-value" style="color:#39D353">ATIVO</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-card"><div class="metric-title">FOCO ATUAL</div><div class="metric-value" style="color:#58A6FF">{concurso}</div></div>', unsafe_allow_html=True)
 
     st.write("")
 
-    # 2. HEATMAP (GRADE COMPLETA DE 365 DIAS)
+    # 2. HEATMAP ESTÁTICO (GRADE COMPLETA)
     st.markdown("**CONSTÂNCIA ANUAL**")
     hoje = datetime.now()
     inicio_ano = datetime(hoje.year, 1, 1)
-    # Criamos a grade completa do ano
     all_days = pd.date_range(start=inicio_ano, end=inicio_ano + timedelta(days=364))
-    df_full_year = pd.DataFrame({'data_dt': all_days})
+    df_full = pd.DataFrame({'data_dt': all_days})
     
     if not df_p.empty:
         df_p['data_dt'] = pd.to_datetime(df_p['data'], format='%d/%m/%Y')
         df_daily = df_p.groupby('data_dt')['tempo'].sum().reset_index()
-        df_heat = df_full_year.merge(df_daily, on='data_dt', how='left').fillna(0)
+        df_heat = df_full.merge(df_daily, on='data_dt', how='left').fillna(0)
     else:
-        df_heat = df_full_year.assign(tempo=0)
+        df_heat = df_full.assign(tempo=0)
 
     df_heat['week'] = df_heat['data_dt'].dt.isocalendar().week
-    df_heat['day'] = df_heat['data_dt'].dt.weekday # 0=Segunda, 6=Domingo
+    df_heat['day'] = df_heat['data_dt'].dt.weekday
 
     fig_heat = go.Figure(data=go.Heatmap(
         z=df_heat['tempo'], x=df_heat['week'], y=df_heat['day'],
         colorscale=[[0, '#161B22'], [0.1, '#0E4429'], [0.5, '#26A641'], [1, '#39D353']],
-        showscale=False, xgap=3, ygap=3, hovertemplate='Data: %{customdata}<br>Minutos: %{z}<extra></extra>',
-        customdata=df_heat['data_dt'].dt.strftime('%d/%m')
+        showscale=False, xgap=3, ygap=3, 
+        hoverinfo='skip' # Desabilita o balão de informação ao passar o mouse
     ))
     fig_heat.update_layout(
-        height=180, margin=dict(t=5, b=5, l=0, r=0),
-        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-        yaxis=dict(showgrid=False, zeroline=False, tickvals=[0,2,4,6], ticktext=['S','Q','Q','D'], autorange="reversed"),
-        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
+        height=160, margin=dict(t=0, b=0, l=0, r=0),
+        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False, fixedrange=True),
+        yaxis=dict(showgrid=False, zeroline=False, tickvals=[0,2,4,6], ticktext=['S','Q','Q','D'], autorange="reversed", fixedrange=True),
+        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+        dragmode=False # Desabilita seleção e zoom
     )
-    st.plotly_chart(fig_heat, use_container_width=True)
+    st.plotly_chart(fig_heat, use_container_width=True, config={'displayModeBar': False})
 
-    # 3. PAINEL INFERIOR (DISCIPLINAS + REGISTRO)
-    c_left, c_right = st.columns([1.5, 1])
+    # 3. CONTEÚDO DIVIDIDO
+    cl, cr = st.columns([1.4, 1])
 
-    with c_left:
-        st.markdown("**DESEMPENHO POR DISCIPLINA**")
+    with cl:
+        st.markdown("**QUADRO DE DISCIPLINAS**")
         if not df_p.empty:
-            df_display = df_p.groupby('materia').agg({'tempo':'sum', 'acertos':'sum', 'total_q':'sum'}).reset_index()
-            df_display['%'] = (df_display['acertos']/df_display['total_q']*100).fillna(0).map('{:.1f}%'.format)
-            st.dataframe(df_display, use_container_width=True, hide_index=True)
+            df_m = df_p.groupby('materia').agg({'tempo':'sum', 'acertos':'sum', 'total_q':'sum'}).reset_index()
+            df_m['%'] = (df_m['acertos']/df_m['total_q']*100).fillna(0).map('{:.1f}%'.format)
+            df_m['Horas'] = (df_m['tempo']/60).map('{:.1f}h'.format)
+            st.dataframe(df_m[['materia', 'Horas', 'acertos', 'total_q', '%']], use_container_width=True, hide_index=True)
         else:
-            st.info("Nenhum dado registrado.")
+            st.info("Inicie seus estudos para preencher o quadro.")
 
-    with c_right:
-        st.markdown("**SESSÃO DE ESTUDO**")
-        with st.container():
-            mat = st.selectbox("Disciplina", materias_list)
-            giro = st.number_input("Giro", 1)
-            
-            # Cronômetro Digital
-            t_foco = st.select_slider("Tempo Alvo (Min)", options=[15, 30, 45, 60, 90], value=30)
-            timer_place = st.empty()
-            timer_place.markdown(f'<div class="timer-digital">{t_foco:02d}:00</div>', unsafe_allow_html=True)
-            
-            col_btn1, col_btn2 = st.columns(2)
-            if col_btn1.button("▶️ START"):
-                for t in range(t_foco * 60, -1, -1):
-                    mins, secs = divmod(t, 60)
-                    timer_place.markdown(f'<div class="timer-digital">{mins:02d}:{secs:02d}</div>', unsafe_allow_html=True)
-                    time.sleep(1)
-                st.balloons()
-            
-            st.divider()
-            t_final = st.select_slider("Tempo Real Realizado", options=[0, 15, 30, 45, 60, 90, 120, 180], value=t_foco)
-            q_t = st.number_input("Questões", 0)
-            q_a = st.number_input("Acertos", 0)
-            
-            if st.button("💾 SALVAR ESTUDO"):
-                salvar_dados("progresso", pd.DataFrame([{"data": datetime.now().strftime("%d/%m/%Y"), "materia": mat, "giro": giro, "tempo": t_final, "acertos": q_a, "total_q": q_t, "paginas": 0}]))
-                st.rerun()
+    with cr:
+        st.markdown("**CONTROLE DE SESSÃO**")
+        mat = st.selectbox("Escolha a Disciplina", materias_list)
+        giro = st.number_input("Giro Atual", 1)
+        
+        # Cronômetro Digital Visual
+        t_alvo = st.select_slider("Focar por (Min):", options=[15, 30, 45, 60, 90, 120], value=30)
+        t_area = st.empty()
+        t_area.markdown(f'<div class="timer-digital">{t_alvo:02d}:00</div>', unsafe_allow_html=True)
+        
+        if st.button("▶️ INICIAR FOCO"):
+            for t in range(t_alvo * 60, -1, -1):
+                m, s = divmod(t, 60)
+                t_area.markdown(f'<div class="timer-digital">{m:02d}:{s:02d}</div>', unsafe_allow_html=True)
+                time.sleep(1)
+            st.balloons()
 
-# --- TAB CADERNO DE ERROS ---
+        st.divider()
+        t_real = st.select_slider("Tempo Realizado (Min)", options=[0, 15, 30, 45, 60, 90, 120, 180, 240], value=t_alvo)
+        q_t = st.number_input("Qtd Questões", 0)
+        q_a = st.number_input("Qtd Acertos", 0)
+        
+        if st.button("💾 REGISTRAR SESSÃO"):
+            salvar_dados("progresso", pd.DataFrame([{"data": datetime.now().strftime("%d/%m/%Y"), "materia": mat, "giro": giro, "tempo": t_real, "acertos": q_a, "total_q": q_t, "paginas": 0}]))
+            st.rerun()
+
+# --- TAB ERROS ---
 with tab_erros:
     st.subheader("📓 Caderno de Erros")
-    with st.expander("➕ Adicionar Novo Erro"):
-        e_mat = st.selectbox("Matéria", materias_list, key="err_m")
-        e_link = st.text_input("Link da Questão")
+    with st.expander("➕ Adicionar Erro"):
+        e_mat = st.selectbox("Matéria", materias_list, key="em")
+        e_link = st.text_input("Link/ID Questão")
         e_tipo = st.selectbox("Causa", ["Base Teórica", "Atenção", "Pegadinha", "Esquecimento"])
-        e_obs = st.text_area("Insight")
-        if st.button("💾 SALVAR ERRO"):
+        e_obs = st.text_area("O que não errar mais?")
+        if st.button("💾 SALVAR"):
             salvar_dados("caderno_erros", pd.DataFrame([{"data": datetime.now().strftime("%d/%m/%Y"), "materia": e_mat, "link": e_link, "tipo_erro": e_tipo, "comentario": e_obs}]))
             st.rerun()
     
     if not df_erros.empty:
-        for _, row in df_erros.iterrows():
-            st.markdown(f"""<div class="card-erro"><b>{row['materia']}</b> | <span style="color:#F85149">{row.get('tipo_erro','Erro')}</span><br>{row['comentario']}<br><a href="{row['link']}">🔗 Ver Questão</a></div>""", unsafe_allow_html=True)
-
-# --- TAB CONFIG ---
-with tab_config:
-    st.subheader("⚙️ Configurações")
-    n_conc = st.text_input("Concurso", value=concurso)
-    n_mats = st.text_area("Matérias (vírgula)", value=",".join(materias_list))
-    if st.button("💾 ATUALIZAR TUDO"):
-        salvar_dados("config", pd.DataFrame([{"concurso": n_conc, "materias": n_mats}]))
-        st.rerun()
+        for _, r in df_erros.iterrows():
+            st.markdown(f"""<div class="card-erro"><b>{r['materia']}</b> | {r.get('tipo_erro','-')}<br>{r['comentario']}<br><a href="{r['link']}">🔗 Questão</a></div>""", unsafe_allow_html=True)
