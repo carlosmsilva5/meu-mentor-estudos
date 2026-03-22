@@ -178,31 +178,40 @@ elif page == "🎯 Ciclo de Estudos":
         with grid_cols[idx % 3]:
             st.markdown(f'<div class="ciclo-card"><div style="font-size:14px; color:#3ec6a8; font-weight:bold;">{row["materia"]}</div><div style="font-size:24px; font-weight:bold; margin:10px 0;">{tempo_fmt}</div><div style="font-size:11px; color:#b0b3b8;">Peso: {row["peso"]} | Nível: {row["nivel"]}</div></div>', unsafe_allow_html=True)
 
-# ---------------- NOVA ABA: GESTÃO DE DATOS ----------------
+# ---------------- GESTÃO DE DATOS (ATUALIZADO) ----------------
 elif page == "⚙️ Gestão de Dados":
     st.title("Gerenciar Planilha")
     
-    tab1, tab2 = st.tabs(["📚 Disciplinas", "📝 Editar Registros"])
+    tab1, tab2, tab3 = st.tabs(["📚 Disciplinas", "📝 Histórico de Estudo", "❌ Caderno de Erros"])
     
     with tab1:
         st.subheader("Adicionar Nova Disciplina")
-        nova_mat = st.text_input("Nome da Matéria (ex: Direito Tributário)")
+        nova_mat = st.text_input("Nome da Matéria")
         if st.button("Adicionar à Lista"):
             if nova_mat and nova_mat not in materias_list:
                 nova_lista = ",".join(materias_list + [nova_mat])
                 overwrite_data("config", pd.DataFrame([{"materias": nova_lista}]))
-                st.success(f"'{nova_mat}' adicionada! Reiniciando...")
+                st.success(f"'{nova_mat}' adicionada!")
                 st.rerun()
 
     with tab2:
         st.subheader("Editar Histórico de Estudo")
-        st.warning("Cuidado: Alterações aqui refletem diretamente na planilha.")
         if not df_estudo.empty:
-            # Tabela editável
-            df_editado = st.data_editor(df_estudo, num_rows="dynamic", use_container_width=True)
+            df_editado = st.data_editor(df_estudo, num_rows="dynamic", use_container_width=True, key="editor_estudo")
             if st.button("Salvar Alterações no Histórico"):
                 overwrite_data("progresso", df_editado)
-                st.success("Histórico atualizado com sucesso!")
+                st.success("Histórico atualizado!")
                 st.rerun()
         else:
-            st.info("Nenhum registro para editar.")
+            st.info("Nenhum registro de estudo encontrado.")
+
+    with tab3:
+        st.subheader("Editar Caderno de Erros")
+        if not df_erros.empty:
+            df_erros_editado = st.data_editor(df_erros, num_rows="dynamic", use_container_width=True, key="editor_erros")
+            if st.button("Salvar Alterações nos Erros"):
+                overwrite_data("caderno_erros", df_erros_editado)
+                st.success("Caderno de erros atualizado!")
+                st.rerun()
+        else:
+            st.info("Nenhum erro registrado para editar.")
