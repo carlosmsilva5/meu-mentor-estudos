@@ -6,14 +6,16 @@ import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import time
 
-# --- CONFIGURAÇÃO ---
-st.set_page_config(page_title="Mentor Elite Ultra", layout="wide")
+# --- CONFIGURAÇÃO VISUAL ---
+st.set_page_config(page_title="Mentor Elite Pro", layout="wide")
 
 st.markdown("""
     <style>
     .stApp { background-color: #0E1117; color: #FAFAFA; }
     .card-erro { background-color: #1C2128; padding: 15px; border-radius: 10px; border-left: 5px solid #E63946; margin-bottom: 10px; border: 1px solid #30363D; }
     .status-revisao { padding: 15px; border-radius: 10px; border: 1px solid #FFA500; background-color: #332100; color: #FFCC66; font-weight: bold; margin-bottom: 20px; }
+    /* Estilo do Cronómetro Digital */
+    .timer-digital { font-family: 'Courier New', Courier, monospace; font-size: 70px; font-weight: bold; color: #00FF41; text-align: center; background: #000; padding: 20px; border-radius: 15px; border: 2px solid #30363D; margin-bottom: 10px; text-shadow: 0 0 10px #00FF41; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -34,14 +36,14 @@ df_p = carregar_dados("progresso")
 df_config = carregar_dados("config")
 df_erros = carregar_dados("caderno_erros")
 
-concurso = df_config["concurso"].iloc[0] if not df_config.empty else "Foco: TRF4 / Federal"
+concurso = df_config["concurso"].iloc[0] if not df_config.empty else "Foco: Federal"
 materias_list = str(df_config["materias"].iloc[0]).split(",") if not df_config.empty else ["Português"]
 
 st.title(f"🎯 {concurso}")
 
 tabs = st.tabs(["🎯 Sessão de Estudo", "📊 Performance & Heatmap", "📓 Caderno de Erros", "⚙️ Config"])
 
-# --- ABA 1: SESSÃO (MANTIDO TUDO) ---
+# --- ABA 1: SESSÃO (COM CRONÓMETRO DIGITAL) ---
 with tabs[0]:
     col_m, col_g = st.columns(2)
     materia = col_m.selectbox("Disciplina:", materias_list)
@@ -50,22 +52,25 @@ with tabs[0]:
     if giro > 1:
         st.markdown(f'<div class="status-revisao">🔄 MODO REVISÃO: {materia} (Giro {giro})</div>', unsafe_allow_html=True)
 
-    with st.expander("⏳ Cronômetro de Foco", expanded=False):
+    with st.expander("⏳ Cronómetro Digital", expanded=True):
         t_foco = st.select_slider("Minutos:", options=[15, 25, 30, 45, 60, 90, 120], value=30)
-        if st.button("▶️ INICIAR"):
-            msg = st.empty()
-            bar = st.progress(0)
-            for t in range(t_foco * 60, 0, -1):
+        display_timer = st.empty()
+        
+        col_btn1, col_btn2 = st.columns(2)
+        if col_btn1.button("▶️ INICIAR FOCO"):
+            for t in range(t_foco * 60, -1, -1):
                 mins, secs = divmod(t, 60)
-                msg.warning(f"⌛ Foco: {mins:02d}:{secs:02d}")
-                bar.progress(1.0 - (t / (t_foco * 60)))
+                display_timer.markdown(f'<div class="timer-digital">{mins:02d}:{secs:02d}</div>', unsafe_allow_html=True)
                 time.sleep(1)
-            st.success("Sessão Concluída!")
+            st.success("Sessão Terminada!")
+        else:
+            display_timer.markdown(f'<div class="timer-digital">{t_foco:02d}:00</div>', unsafe_allow_html=True)
 
-    st.subheader("📝 Registro")
+    st.divider()
+    st.subheader("📝 Registro Final")
     topico = st.text_input("Tópico:")
     c1, c2, c3, c4 = st.columns(4)
-    t_manual = c1.number_input("Minutos", min_value=0, value=30)
+    t_manual = c1.number_input("Minutos Totais", min_value=0, value=t_foco)
     q_t = c2.number_input("Questões", 0)
     q_a = c3.number_input("Acertos", 0)
     pags = c4.number_input("Páginas", 0)
@@ -75,67 +80,52 @@ with tabs[0]:
         salvar_dados("progresso", novo_p)
         st.rerun()
 
-# --- ABA 2: PERFORMANCE & HEATMAP (A VOLTA DO MAPA) ---
+# --- ABA 2: PERFORMANCE & HEATMAP ---
 with tabs[1]:
     if not df_p.empty:
-        st.subheader("🔥 Mapa de Calor (Consistência)")
-        
-        # Lógica do Heatmap
+        st.subheader("🔥 Consistência Diária")
         df_p['data_dt'] = pd.to_datetime(df_p['data'], format='%d/%m/%Y')
         df_daily = df_p.groupby('data_dt')['tempo'].sum().reset_index()
-        
-        # Criar matriz para o Heatmap (últimas 10 semanas)
         hoje = datetime.now()
-        inicio = hoje - timedelta(weeks=10)
+        inicio = hoje - timedelta(weeks=12)
         datas_range = pd.date_range(start=inicio, end=hoje)
-        df_heat = pd.DataFrame({'data_dt': datas_range})
-        df_heat = df_heat.merge(df_daily, on='data_dt', how='left').fillna(0)
-        
+        df_heat = pd.DataFrame({'data_dt': datas_range}).merge(df_daily, on='data_dt', how='left').fillna(0)
         df_heat['week'] = df_heat['data_dt'].dt.isocalendar().week
         df_heat['day'] = df_heat['data_dt'].dt.weekday
         
-        fig_heat = go.Figure(data=go.Heatmap(
-            z=df_heat['tempo'],
-            x=df_heat['data_dt'],
-            y=df_heat['day'],
-            colorscale='Viridis',
-            showscale=False,
-            xgap=3, ygap=3
-        ))
-        fig_heat.update_layout(height=200, margin=dict(t=0, b=0, l=0, r=0), 
-                              yaxis=dict(tickvals=[0,2,4,6], ticktext=['Seg', 'Qua', 'Sex', 'Dom']))
+        fig_heat = go.Figure(data=go.Heatmap(z=df_heat['tempo'], x=df_heat['data_dt'], y=df_heat['day'], colorscale='Viridis', showscale=False, xgap=2, ygap=2))
+        fig_heat.update_layout(height=180, margin=dict(t=0, b=0, l=0, r=0), yaxis=dict(tickvals=[0,2,4,6], ticktext=['Seg','Qua','Sex','Dom']))
         st.plotly_chart(fig_heat, use_container_width=True)
 
         st.divider()
-        
-        # Gráfico de Rendimento por Matéria
         df_agrupado = df_p.groupby('materia').agg({'acertos': 'sum', 'total_q': 'sum'}).reset_index()
         df_agrupado['%'] = (df_agrupado['acertos'] / df_agrupado['total_q'] * 100).fillna(0)
-        fig_bar = px.bar(df_agrupado, x='materia', y='%', text_auto='.1f', title="Rendimento (%)", template="plotly_dark")
+        fig_bar = px.bar(df_agrupado, x='materia', y='%', text_auto='.1f', title="Rendimento por Disciplina (%)", template="plotly_dark")
         st.plotly_chart(fig_bar, use_container_width=True)
     else:
-        st.info("Registre seu primeiro estudo para ver o gráfico de calor!")
+        st.info("Registe o seu estudo para gerar estatísticas.")
 
-# --- ABA 3: CADERNO DE ERROS (MANTIDO) ---
+# --- ABA 3: CADERNO DE ERROS (COM TIPO DE ERRO REINSERIDO) ---
 with tabs[2]:
-    st.header("📓 Caderno de Erros")
-    with st.expander("📝 Catalogar Novo Erro"):
-        e_mat = st.selectbox("Disciplina:", materias_list, key="err")
-        e_link = st.text_input("Link da Questão:")
-        e_obs = st.text_area("O que aprendi?")
-        if st.button("💾 SALVAR ERRO"):
-            salvar_dados("caderno_erros", pd.DataFrame([{"data": datetime.now().strftime("%d/%m/%Y"), "materia": e_mat, "link": e_link, "comentario": e_obs}]))
+    st.header("📓 Caderno de Erros Estratégicos")
+    with st.expander("📝 Catalogar Novo Erro", expanded=True):
+        e_mat = st.selectbox("Matéria:", materias_list, key="err_m")
+        e_link = st.text_input("Link da Questão (URL):")
+        e_tipo = st.selectbox("Causa do Erro:", ["Falta de Base/Teoria", "Falta de Atenção", "Esquecimento", "Interpretação/Pegadinha", "Assunto não Estudado"])
+        e_obs = st.text_area("O que aprendi com este erro?")
+        if st.button("💾 SALVAR NO CADERNO"):
+            salvar_dados("caderno_erros", pd.DataFrame([{"data": datetime.now().strftime("%d/%m/%Y"), "materia": e_mat, "link": e_link, "tipo_erro": e_tipo, "comentario": e_obs}]))
             st.rerun()
     
     if not df_erros.empty:
+        st.divider()
         for _, row in df_erros.iterrows():
-            st.markdown(f'<div class="card-erro"><b>{row["materia"]}</b><br>{row["comentario"]}<br><a href="{row["link"]}" target="_blank">🔗 Ver Questão</a></div>', unsafe_allow_html=True)
+            st.markdown(f"""<div class="card-erro"><b>{row['materia']}</b> | <span style="color:#E63946;">{row.get('tipo_erro', 'Erro')}</span><br><i>"{row['comentario']}"</i><br><a href="{row['link']}" target="_blank">🔗 Ver Questão</a></div>""", unsafe_allow_html=True)
 
-# --- ABA 4: CONFIG (MANTIDO) ---
+# --- ABA 4: CONFIG ---
 with tabs[3]:
-    st.subheader("⚙️ Configurações")
-    novo_nome = st.text_input("Concurso:", value=concurso)
+    novo_nome = st.text_input("Nome do Concurso:", value=concurso)
     novas_mats = st.text_area("Matérias (vírgula):", value=",".join(materias_list))
-    if st.button("💾 ATUALIZAR"):
+    if st.button("💾 ATUALIZAR EDITAL"):
         salvar_dados("config", pd.DataFrame([{"concurso": novo_nome, "materias": novas_mats}]))
         st.rerun()
