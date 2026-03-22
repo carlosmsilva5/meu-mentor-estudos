@@ -182,13 +182,25 @@ if page == "Home":
 
         with col_grafico2:
             st.subheader("Evolução (Últimos 7 Dias)")
+            
+            # 1. Cria uma linha do tempo contínua dos últimos 7 dias (Hoje + 6 dias anteriores)
+            hoje = pd.Timestamp.today().normalize()
+            ultimos_7_dias = pd.date_range(end=hoje, periods=7)
+            df_dias = pd.DataFrame({'data_fmt': ultimos_7_dias})
+            
+            # 2. Formata a data e agrupa o que foi estudado de verdade
             df_estudo['data_fmt'] = pd.to_datetime(df_estudo['data'], format='%d/%m/%Y', errors='coerce')
-            evolucao = df_estudo.groupby('data_fmt')["tempo_num"].sum().reset_index().sort_values('data_fmt').tail(7)
+            estudo_agrupado = df_estudo.groupby('data_fmt')["tempo_num"].sum().reset_index()
+            
+            # 3. Mescla o calendário com os estudos (dias sem estudo recebem 0)
+            evolucao = pd.merge(df_dias, estudo_agrupado, on='data_fmt', how='left').fillna(0)
             evolucao['data_str'] = evolucao['data_fmt'].dt.strftime('%d/%m')
             
+            # 4. Converte e formata os textos
             evolucao['horas_estudo'] = (evolucao['tempo_num'] / 60).round(1)
             evolucao['texto_tempo'] = evolucao['tempo_num'].apply(formatar_tempo)
             
+            # 5. Plota o gráfico
             fig_line = px.line(
                 evolucao, 
                 x='data_str', 
@@ -196,11 +208,19 @@ if page == "Home":
                 text='texto_tempo', 
                 markers=True, 
                 labels={'horas_estudo': 'Horas', 'data_str': 'Data'}, 
-                color_discrete_sequence=['#3ec6a8']
+                color_discrete_sequence=['white']
             )
             
+            # 6. Ajusta o visual para a linha ancorar no eixo X (Zero)
             fig_line.update_traces(textposition="top center") 
-            fig_line.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='white'))
+            fig_line.update_layout(
+                yaxis=dict(rangemode='tozero', showgrid=True, gridcolor='#4f4f4f'), # <--- Força começar do Zero
+                xaxis=dict(showgrid=False),
+                paper_bgcolor='rgba(0,0,0,0)', 
+                plot_bgcolor='rgba(0,0,0,0)', 
+                font=dict(color='white'),
+                margin=dict(l=20, r=20, t=20, b=20)
+            )
             
             st.plotly_chart(fig_line, use_container_width=True, config={'staticPlot': True})
 
