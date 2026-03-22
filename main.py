@@ -53,9 +53,9 @@ def overwrite_data(sheet, df_full):
 df_estudo = load_data("progresso")
 df_erros = load_data("caderno_erros")
 df_config = load_data("config")
-materias_list = str(df_config["materias"].iloc[0]).split(",") if not df_config.empty else ["Português"]
+materias_list = [m.strip() for m in str(df_config["materias"].iloc[0]).split(",")] if not df_config.empty else ["Português"]
 
-# ---------------- SIDEBAR COM ÍCONES ----------------
+# ---------------- SIDEBAR ----------------
 with st.sidebar:
     st.title("📘 Mentor Elite")
     menu_map = {
@@ -68,7 +68,7 @@ with st.sidebar:
     selection = st.radio("", list(menu_map.keys()))
     page = menu_map[selection]
 
-# ---------------- PÁGINAS ----------------
+# ---------------- HOME ----------------
 if page == "Home":
     st.title("Dashboard")
     t_min = pd.to_numeric(df_estudo['tempo'], errors='coerce').sum() if not df_estudo.empty else 0
@@ -87,10 +87,11 @@ if page == "Home":
         df_estudo['acertos'] = pd.to_numeric(df_estudo['acertos'], errors='coerce').fillna(0)
         df_estudo['total_q'] = pd.to_numeric(df_estudo['total_q'], errors='coerce').fillna(0)
         painel = df_estudo.groupby("materia").agg({"tempo":"sum", "acertos":"sum", "total_q":"sum"}).reset_index()
-        painel["tempo"] = painel["tempo"].apply(formatar_tempo)
-        painel["%"] = (painel["acertos"]/painel["total_q"]*100).fillna(0).map("{:.1f}%".format)
-        st.dataframe(painel, use_container_width=True, hide_index=True)
+        painel["tempo_total"] = painel["tempo"].apply(formatar_tempo)
+        painel["% Acerto"] = (painel["acertos"]/painel["total_q"]*100).fillna(0).map("{:.1f}%".format)
+        st.dataframe(painel[["materia", "tempo_total", "% Acerto", "total_q"]], use_container_width=True, hide_index=True)
 
+# ---------------- REGISTRAR & ERROS (MANTIDOS) ----------------
 elif page == "Registrar Estudo":
     st.title("Novo Registro")
     with st.form("form_registro", clear_on_submit=True):
@@ -118,66 +119,80 @@ elif page == "Caderno de Erros":
             st.cache_data.clear()
             st.rerun()
 
-elif page == "Ciclo de Estudos":
+# ---------------- CICLO DE ESTUDOS (CORRIGIDO) ----------------
+elif page == "🎯 Ciclo de Estudos":
     st.title("🎯 Planejamento do Ciclo")
     horas_semana = st.number_input("Horas Totais na Semana", 5, 100, 20)
     
     dados_ciclo = []
     for m in materias_list:
-        with st.expander(f"Ajustar: {m}", expanded=True):
+        with st.expander(f"Configurar: {m}", expanded=True):
             c1, c2 = st.columns(2)
-            p = c1.select_slider("Peso", [1,2,3,4,5], 3, key=f"p_{m}")
-            n = c2.select_slider("Nível", [1,2,3,4,5], 3, key=f"n_{m}")
+            p = c1.select_slider("Peso no Edital", [1,2,3,4,5], 3, key=f"p_{m}")
+            n = c2.select_slider("Sua Proficiência", [1,2,3,4,5], 3, key=f"n_{m}")
+            # Fator de necessidade: quanto maior o peso e menor o nível, mais tempo ganha
             dados_ciclo.append({"materia": m, "fator": p/n, "peso": p, "nivel": n})
 
     df_c = pd.DataFrame(dados_ciclo)
-    df_c["horas"] = (df_c["fator"] / df_c["fator"].sum()) * horas_semana
+    total_fator = df_c["fator"].sum()
+    df_c["horas"] = (df_c["fator"] / total_fator) * horas_semana
     
-    # Cards
+    # Cards de Metas
+    st.subheader("📅 Meta de Horas por Disciplina")
     cols = st.columns(3)
     for i, r in df_c.iterrows():
         with cols[i % 3]:
-            st.markdown(f'<div class="ciclo-card"><b>{r["materia"]}</b><br><h3>{decimal_para_horas(r["horas"])}</h3><small>Peso {r["peso"]} | Nível {r["nivel"]}</small></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="ciclo-card"><div style="color:#3ec6a8; font-weight:bold;">{r["materia"]}</div><div style="font-size:22px; font-weight:bold; margin:5px 0;">{decimal_para_horas(r["horas"])}</div><small>Peso {r["peso"]} | Nível {r["nivel"]}</small></div>', unsafe_allow_html=True)
 
-    # Tabela de Ordem
-    st.subheader("🗓️ Sugestão de Ordem")
-    df_ord = df_c.sort_values("horas", ascending=False).reset_index()
-    def get_m(idx): return df_ord.iloc[idx % len(df_ord)]['materia'] if not df_ord.empty else "-"
+    # Tabela de Sugestão de Ordem (Exclusiva com suas matérias)
+    st.write("---")
+    st.subheader("🗓️ Sugestão de Ordem Semanal")
+    # Ordena as matérias pela necessidade (fator p/n)
+    df_prioridade = df_c.sort_values("fator", ascending=False).reset_index()
     
-    st.markdown(f"""
-    <table class="cronograma-table">
-        <tr><th>Dia</th><th>Principal</th><th>Complemento</th></tr>
-        <tr><td class="dia-num">1</td><td>{get_m(0)}</td><td>{get_m(len(df_ord)-1)}</td></tr>
-        <tr><td class="dia-num">2</td><td>{get_m(1)}</td><td>{get_m(len(df_ord)-2)}</td></tr>
-        <tr><td class="dia-num">3</td><td>{get_m(2)}</td><td>{get_m(len(df_ord)-3)}</td></tr>
-        <tr><td class="dia-num">4</td><td>{get_m(0)} (Rev)</td><td>{get_m(3)}</td></tr>
-        <tr><td class="dia-num">5</td><td>{get_m(1)} (Rev)</td><td>{get_m(4)}</td></tr>
-        <tr><td class="dia-num">6</td><td>Língua Portuguesa</td><td>Discursiva</td></tr>
-        <tr><td class="dia-num">7</td><td>{get_m(0)}</td><td>Simulado</td></tr>
-    </table>
-    """, unsafe_allow_html=True)
+    def get_m(idx):
+        if df_prioridade.empty: return "-"
+        return df_prioridade.iloc[idx % len(df_prioridade)]['materia']
 
-elif page == "Gestão de Dados":
+    # Monta a tabela focada apenas em alternar as matérias cadastradas
+    html_tabela = f"""
+    <table class="cronograma-table">
+        <tr><th>Dia</th><th>Matéria Principal (Maior Carga)</th><th>Matéria de Giro (Secundária)</th></tr>
+        <tr><td class="dia-num">1</td><td>{get_m(0)}</td><td>{get_m(len(df_prioridade)-1)}</td></tr>
+        <tr><td class="dia-num">2</td><td>{get_m(1)}</td><td>{get_m(len(df_prioridade)-2)}</td></tr>
+        <tr><td class="dia-num">3</td><td>{get_m(2)}</td><td>{get_m(len(df_prioridade)-3)}</td></tr>
+        <tr><td class="dia-num">4</td><td>{get_m(3)}</td><td>{get_m(0)}</td></tr>
+        <tr><td class="dia-num">5</td><td>{get_m(4)}</td><td>{get_m(1)}</td></tr>
+        <tr><td class="dia-num">6</td><td>{get_m(0)}</td><td>{get_m(2)}</td></tr>
+        <tr><td class="dia-num">7</td><td>{get_m(1)}</td><td>{get_m(3)}</td></tr>
+    </table>
+    """
+    st.markdown(html_tabela, unsafe_allow_html=True)
+
+# ---------------- GESTÃO DE DATOS (FUNCIONAL) ----------------
+elif page == "⚙️ Gestão de Dados":
     st.title("⚙️ Gestão de Dados")
     t1, t2, t3 = st.tabs(["📚 Disciplinas", "📝 Histórico", "❌ Erros"])
     
     with t1:
-        nova = st.text_input("Nova Matéria")
-        if st.button("Adicionar"):
-            nova_lista = ",".join(materias_list + [nova])
-            overwrite_data("config", pd.DataFrame([{"materias": nova_lista}]))
-            st.rerun()
+        st.info(f"Matérias Atuais: {', '.join(materias_list)}")
+        nova = st.text_input("Adicionar Nova Matéria")
+        if st.button("Salvar Nova Lista"):
+            if nova:
+                nova_lista = ",".join(materias_list + [nova])
+                overwrite_data("config", pd.DataFrame([{"materias": nova_lista}]))
+                st.rerun()
             
     with t2:
         if not df_estudo.empty:
-            ed_est = st.data_editor(df_estudo, num_rows="dynamic", key="ed_est")
-            if st.button("Salvar Histórico"):
+            ed_est = st.data_editor(df_estudo, num_rows="dynamic", key="ed_est", use_container_width=True)
+            if st.button("Confirmar Alterações no Histórico"):
                 overwrite_data("progresso", ed_est)
-                st.rerun()
+                st.success("Histórico atualizado!"); st.rerun()
                 
     with t3:
         if not df_erros.empty:
-            ed_err = st.data_editor(df_erros, num_rows="dynamic", key="ed_err")
-            if st.button("Salvar Erros"):
+            ed_err = st.data_editor(df_erros, num_rows="dynamic", key="ed_err", use_container_width=True)
+            if st.button("Confirmar Alterações nos Erros"):
                 overwrite_data("caderno_erros", ed_err)
-                st.rerun()
+                st.success("Erros atualizados!"); st.rerun()
