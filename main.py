@@ -383,7 +383,7 @@ elif page == "Gestão de Dados":
             st.success(f"{nova} adicionada!")
             st.rerun()
             
-   with t3:
+    with t3:
         st.markdown("### Editar Histórico de Sessões")
         if not df_estudo.empty:
             ed_est = st.data_editor(df_estudo, num_rows="dynamic", key="ed_est", use_container_width=True)
