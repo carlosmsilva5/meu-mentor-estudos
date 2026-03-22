@@ -1,95 +1,136 @@
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
+import plotly.express as px
 from datetime import datetime
+import time
 
-# --- CONFIGURAÇÃO INICIAL ---
-st.set_page_config(page_title="Mentor Elite", layout="wide")
+# --- CONFIGURAÇÃO VISUAL ---
+st.set_page_config(page_title="Mentor Elite Pro", layout="wide")
 
-# Estilo para os Cards de Erro
 st.markdown("""
     <style>
-    .card-erro { background-color: #161B22; padding: 15px; border-radius: 10px; border-left: 5px solid #E63946; margin-bottom: 10px; }
     .stApp { background-color: #0E1117; color: #FAFAFA; }
+    .card-erro { background-color: #1C2128; padding: 15px; border-radius: 10px; border-left: 5px solid #E63946; margin-bottom: 10px; border: 1px solid #30363D; }
+    .status-revisao { padding: 15px; border-radius: 10px; border: 1px solid #FFA500; background-color: #332100; color: #FFCC66; font-weight: bold; margin-bottom: 20px; }
+    .metric-box { background-color: #161B22; padding: 10px; border-radius: 8px; border: 1px solid #30363D; text-align: center; }
     </style>
     """, unsafe_allow_html=True)
 
-# Conexão com tratamento de erro
-try:
-    conn = st.connection("gsheets", type=GSheetsConnection)
-except Exception as e:
-    st.error(f"Erro na conexão com o Google Sheets: {e}")
+conn = st.connection("gsheets", type=GSheetsConnection)
 
 def carregar_dados(aba):
-    try:
-        df = conn.read(worksheet=aba, ttl=0)
-        return df.dropna(how='all') # Remove linhas fantasmas vazias
-    except:
-        return pd.DataFrame()
+    try: return conn.read(worksheet=aba, ttl=0).dropna(how='all')
+    except: return pd.DataFrame()
 
 def salvar_dados(aba, dados_df):
-    try:
-        df_atual = carregar_dados(aba)
-        df_novo = pd.concat([df_atual, dados_df], ignore_index=True)
-        conn.update(worksheet=aba, data=df_novo)
-        st.cache_data.clear()
-        st.success("Salvo com sucesso!")
-    except Exception as e:
-        st.error(f"Erro ao salvar na planilha: {e}")
+    df_atual = carregar_dados(aba)
+    df_novo = pd.concat([df_atual, dados_df], ignore_index=True)
+    conn.update(worksheet=aba, data=df_novo)
+    st.cache_data.clear()
 
-# --- CARREGAMENTO ---
+# --- CARREGAMENTO DE DADOS ---
 df_p = carregar_dados("progresso")
 df_config = carregar_dados("config")
 df_erros = carregar_dados("caderno_erros")
 
-# Garantir que existam matérias
-if not df_config.empty and "materias" in df_config.columns:
-    materias_list = str(df_config["materias"].iloc[0]).split(",")
-else:
-    materias_list = ["Português", "Direito Administrativo"]
+# Lógica de Matérias e Concurso
+concurso = df_config["concurso"].iloc[0] if not df_config.empty else "Foco: Federal"
+materias_list = str(df_config["materias"].iloc[0]).split(",") if not df_config.empty else ["Português"]
 
-st.title("🎯 Mentor de Estudos")
+st.title(f"🎯 {concurso}")
 
-tabs = st.tabs(["🎯 Sessão", "📊 Performance", "📓 Caderno de Erros", "⚙️ Config"])
+tabs = st.tabs(["🎯 Sessão de Estudo", "📊 Performance", "📓 Caderno de Erros", "⚙️ Config"])
 
-# --- ABA 1: SESSÃO ---
+# --- ABA 1: SESSÃO COM CRONÔMETRO E GIRO ---
 with tabs[0]:
-    col1, col2 = st.columns(2)
-    materia = col1.selectbox("Matéria:", materias_list)
-    tempo = col2.number_input("Minutos Estudados:", min_value=0, value=30)
+    col_m, col_g = st.columns(2)
+    materia = col_m.selectbox("Disciplina:", materias_list)
+    giro = col_g.number_input("Giro/Semana Atual:", min_value=1, step=1, value=1)
     
-    c1, c2, c3 = st.columns(3)
-    q_t = c1.number_input("Questões Total", 0)
-    q_a = c2.number_input("Acertos", 0)
-    pags = c3.number_input("Páginas", 0)
+    if giro > 1:
+        st.markdown(f'<div class="status-revisao">🔄 MODO REVISÃO ATIVO: {materia} (Giro {giro})</div>', unsafe_allow_html=True)
+    else:
+        st.info(f"🆕 ESTUDO DE CONTEÚDO NOVO: {materia}")
+
+    # Cronômetro Regressivo
+    with st.expander("⏳ Iniciar Cronômetro de Foco", expanded=False):
+        t_foco = st.select_slider("Minutos desejados:", options=[15, 25, 30, 45, 60, 90, 120], value=30)
+        if st.button("▶️ COMEÇAR CONTAGEM"):
+            msg = st.empty()
+            bar = st.progress(0)
+            for t in range(t_foco * 60, 0, -1):
+                mins, secs = divmod(t, 60)
+                msg.warning(f"⌛ Foco Total: {mins:02d}:{secs:02d}")
+                bar.progress(1.0 - (t / (t_foco * 60)))
+                time.sleep(1)
+            st.success("Sessão Terminada! Registre os resultados abaixo.")
+
+    st.divider()
     
-    if st.button("💾 SALVAR ESTUDO"):
-        novo = pd.DataFrame([{"data": datetime.now().strftime("%d/%m/%Y"), "materia": materia, "tempo": tempo, "acertos": q_a, "total_q": q_t, "paginas": pags}])
-        salvar_dados("progresso", novo)
+    st.subheader("📝 Registro da Atividade")
+    topico = st.text_input("Assunto/Tópico (ex: Atos Administrativos):")
+    
+    c1, c2, c3, c4 = st.columns(4)
+    t_manual = c1.number_input("Tempo (min)", min_value=0, value=30)
+    q_t = c2.number_input("Questões", 0)
+    q_a = c3.number_input("Acertos", 0)
+    pags = c4.number_input("Páginas", 0)
+    
+    humor = st.select_slider("Energia:", options=["Baixa", "Média", "Alta"], value="Média")
+
+    if st.button("💾 SALVAR SESSÃO"):
+        novo_p = pd.DataFrame([{
+            "data": datetime.now().strftime("%d/%m/%Y"), "materia": materia, "giro": giro,
+            "topico": topico, "tempo": t_manual, "acertos": q_a, "total_q": q_t, "paginas": pags, "humor": humor
+        }])
+        salvar_dados("progresso", novo_p)
         st.rerun()
+
+# --- ABA 2: PERFORMANCE (GRÁFICOS) ---
+with tabs[1]:
+    st.header("📊 Seu Desempenho")
+    if not df_p.empty:
+        # Métricas de topo
+        m1, m2, m3 = st.columns(3)
+        total_horas = df_p['tempo'].sum() / 60
+        m1.metric("Horas de Voo", f"{total_horas:.1f}h")
+        
+        acc = (df_p['acertos'].sum() / df_p['total_q'].sum() * 100) if df_p['total_q'].sum() > 0 else 0
+        m2.metric("Aproveitamento", f"{acc:.1f}%")
+        m3.metric("Páginas Lidas", int(df_p['paginas'].sum()))
+
+        # Gráfico por Matéria
+        df_agrupado = df_p.groupby('materia').agg({'acertos': 'sum', 'total_q': 'sum'}).reset_index()
+        df_agrupado['%'] = (df_agrupado['acertos'] / df_agrupado['total_q'] * 100).fillna(0)
+        
+        fig = px.bar(df_agrupado, x='materia', y='%', title="Rendimento por Matéria (%)", template="plotly_dark", color_discrete_sequence=['#1E90FF'])
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.warning("Sem dados para exibir o gráfico.")
 
 # --- ABA 3: CADERNO DE ERROS ---
 with tabs[2]:
-    st.subheader("➕ Novo Erro Estratégico")
-    with st.form("form_erro", clear_on_submit=True):
-        e_mat = st.selectbox("Matéria do Erro:", materias_list)
+    st.header("📓 Registro de Falhas")
+    with st.expander("📝 Adicionar Questão Errada"):
+        e_mat = st.selectbox("Disciplina:", materias_list, key="mat_err")
         e_link = st.text_input("Link da Questão:")
-        e_tipo = st.selectbox("Tipo:", ["Atenção", "Base Teórica", "Pegadinha", "Esquecimento"])
-        e_obs = st.text_area("O que não esquecer?")
-        if st.form_submit_button("SALVAR NO CADERNO"):
-            erro_df = pd.DataFrame([{"data": datetime.now().strftime("%d/%m/%Y"), "materia": e_mat, "link": e_link, "tipo_erro": e_tipo, "comentario": e_obs}])
-            salvar_dados("caderno_erros", erro_df)
+        e_tipo = st.selectbox("Causa:", ["Base Teórica", "Atenção", "Pegadinha", "Esquecimento"])
+        e_obs = st.text_area("Comentário/Lição:")
+        if st.button("💾 CATALOGAR"):
+            salvar_dados("caderno_erros", pd.DataFrame([{"data": datetime.now().strftime("%d/%m/%Y"), "materia": e_mat, "link": e_link, "tipo_erro": e_tipo, "comentario": e_obs}]))
             st.rerun()
-
+    
     if not df_erros.empty:
         st.divider()
         for _, row in df_erros.iterrows():
-            st.markdown(f"""<div class="card-erro"><b>{row.get('materia','-')}</b> | {row.get('tipo_erro','-')}<br>{row.get('comentario','-')}<br><a href="{row.get('link','#')}">🔗 Ver Questão</a></div>""", unsafe_allow_html=True)
+            st.markdown(f"""<div class="card-erro"><b>{row['materia']}</b> - {row['tipo_erro']}<br><i>{row['comentario']}</i><br><a href="{row['link']}" target="_blank">🔗 Ver Questão</a></div>""", unsafe_allow_html=True)
 
 # --- ABA 4: CONFIG ---
 with tabs[3]:
-    st.write("Atualize suas matérias separadas por vírgula:")
-    mats_input = st.text_area("Disciplinas:", value=",".join(materias_list))
-    if st.button("ATUALIZAR EDITAL"):
-        salvar_dados("config", pd.DataFrame([{"concurso": "Objetivo", "materias": mats_input}]))
+    st.subheader("⚙️ Ajustes")
+    novo_nome = st.text_input("Nome do Concurso:", value=concurso)
+    novas_mats = st.text_area("Matérias (separadas por vírgula):", value=",".join(materias_list))
+    if st.button("💾 ATUALIZAR SISTEMA"):
+        salvar_dados("config", pd.DataFrame([{"concurso": novo_nome, "materias": novas_mats}]))
         st.rerun()
