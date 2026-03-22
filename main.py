@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 # ---------------- CONFIG ----------------
 st.set_page_config(layout="wide", page_title="Mentor Elite Pro")
 
-# ---------------- CSS PREMIUM (INTEGRAL) ----------------
+# ---------------- CSS PREMIUM (MANTIDO INTEGRAL) ----------------
 st.markdown("""
 <style>
     .stApp { background-color: #2f3136; color: #e4e6eb; }
@@ -25,11 +25,10 @@ st.markdown("""
     
     .ciclo-card { background: #3a3b3c; border: 1px solid #4f4f4f; padding: 15px; border-radius: 10px; text-align: center; border-top: 4px solid #3ec6a8; }
     
-    /* Tabela de Cronograma */
-    .cronograma-table { width: 100%; border-collapse: collapse; background: #3a3b3c; border-radius: 8px; overflow: hidden; }
+    .cronograma-table { width: 100%; border-collapse: collapse; background: #3a3b3c; border-radius: 8px; overflow: hidden; margin-top: 20px; }
     .cronograma-table td, .cronograma-table th { padding: 12px; border: 1px solid #4f4f4f; text-align: left; }
     .cronograma-table th { background: #202225; color: #3ec6a8; }
-    .dia-num { background: #4e1d3d; color: white; font-weight: bold; text-align: center !important; width: 40px; }
+    .dia-num { background: #4e1d3d; color: white; font-weight: bold; text-align: center !important; width: 45px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -62,27 +61,26 @@ def overwrite_data(sheet, df_full):
     conn.update(worksheet=sheet, data=df_full)
     st.cache_data.clear()
 
-# ---------------- CARREGAMENTO ----------------
+# ---------------- DATA LOAD ----------------
 df_estudo = load_data("progresso")
 df_erros = load_data("caderno_erros")
 df_config = load_data("config")
-materias_list = str(df_config["materias"].iloc[0]).split(",") if not df_config.empty else ["Contabilidade"]
+materias_list = str(df_config["materias"].iloc[0]).split(",") if not df_config.empty else ["Português"]
 
 # ---------------- SIDEBAR COM ÍCONES ----------------
 with st.sidebar:
     st.title("📘 Mentor Elite")
-    # Mapeamento de nomes com ícones
-    menu_options = {
+    menu = {
         "🏠 Home": "Home",
         "🧮 Registrar Estudo": "Registrar Estudo",
         "❌ Caderno de Erros": "Caderno de Erros",
         "🎯 Ciclo de Estudos": "Ciclo de Estudos",
         "⚙️ Gestão de Dados": "Gestão de Dados"
     }
-    selection = st.radio("", list(menu_options.keys()))
-    page = menu_options[selection]
+    selection = st.radio("", list(menu.keys()))
+    page = menu[selection]
 
-# ---------------- PÁGINAS PRESERVADAS ----------------
+# ---------------- HOME (PAINEL DE DISCIPLINAS REMOVIDO DAQUI) ----------------
 if page == "Home":
     st.title("Dashboard")
     t_min = pd.to_numeric(df_estudo['tempo'], errors='coerce').sum() if not df_estudo.empty else 0
@@ -95,7 +93,7 @@ if page == "Home":
     with c2: st.markdown(f'<div class="card"><div class="title">Desempenho</div><div class="value">{aproveitamento:.1f}%</div></div>', unsafe_allow_html=True)
     with c3: st.markdown(f'<div class="card"><div class="title">Erros Totais</div><div class="value">{len(df_erros)}</div></div>', unsafe_allow_html=True)
 
-    st.markdown("### Constância (Últimos 90 dias)")
+    st.markdown("### Constância (90 dias)")
     if not df_estudo.empty:
         df_estudo['data_dt'] = pd.to_datetime(df_estudo['data'], dayfirst=True, errors='coerce').dt.date
         datas_estudo = df_estudo['data_dt'].unique()
@@ -108,73 +106,91 @@ if page == "Home":
         grid_html += '</div>'
         st.markdown(grid_html, unsafe_allow_html=True)
 
+# ---------------- REGISTRAR & ERROS (MANTIDOS) ----------------
 elif page == "Registrar Estudo":
     st.title("Novo Registro")
-    with st.form("form_registro", clear_on_submit=True):
-        materia = st.selectbox("Matéria", materias_list)
-        tipo = st.selectbox("Tipo", ["Teoria Novo", "Revisão", "Questões"])
-        tempo = st.number_input("Tempo (min)", 0)
-        cq1, cq2 = st.columns(2)
-        q_t, q_a = cq1.number_input("Total Q", 0), cq2.number_input("Acertos", 0)
+    with st.form("f_reg", clear_on_submit=True):
+        m = st.selectbox("Matéria", materias_list)
+        t = st.selectbox("Tipo", ["Teoria Novo", "Revisão", "Questões"])
+        tempo = st.number_input("Minutos", 0)
+        q1, q2 = st.columns(2)
+        qt, qa = q1.number_input("Total Q", 0), q2.number_input("Acertos", 0)
         if st.form_submit_button("Salvar"):
-            save_data("progresso", pd.DataFrame([{"data": datetime.now().strftime("%d/%m/%Y"), "materia": materia, "tipo_estudo": tipo, "tempo": tempo, "acertos": q_a, "total_q": q_t}]))
+            save_data("progresso", pd.DataFrame([{"data": datetime.now().strftime("%d/%m/%Y"), "materia": m, "tipo_estudo": t, "tempo": tempo, "acertos": qa, "total_q": qt}]))
             st.rerun()
 
 elif page == "Caderno de Erros":
     st.title("Caderno de Erros")
-    with st.form("form_erro", clear_on_submit=True):
-        materia_e = st.selectbox("Matéria", materias_list)
-        tipo_e = st.selectbox("Causa", ["Teoria", "Atenção", "Pegadinha", "Interpretação"])
-        link_e = st.text_input("Link da Questão")
-        obs_e = st.text_area("Insight/Comentário")
+    with st.form("f_err", clear_on_submit=True):
+        me = st.selectbox("Matéria", materias_list)
+        te = st.selectbox("Causa", ["Teoria", "Atenção", "Pegadinha", "Interpretação"])
+        le = st.text_input("Link URL")
+        oe = st.text_area("Comentário")
         if st.form_submit_button("Registrar Erro"):
-            save_data("caderno_erros", pd.DataFrame([{"data": datetime.now().strftime("%d/%m/%Y"), "materia": materia_e, "tipo": tipo_e, "link": link_e, "comentario": obs_e}]))
+            save_data("caderno_erros", pd.DataFrame([{"data": datetime.now().strftime("%d/%m/%Y"), "materia": me, "tipo": te, "link": le, "comentario": oe}]))
             st.rerun()
 
-# ---------------- CICLO DE ESTUDOS COM ORDEM SUGERIDA ----------------
+# ---------------- CICLO DE ESTUDOS (PAINEL + CARDS + CRONOGRAMA) ----------------
 elif page == "Ciclo de Estudos":
-    st.title("🎯 Gerador de Cronograma Semanal")
-    horas_semana = st.number_input("Horas Totais na Semana", 5, 100, 20)
+    st.title("🎯 Planejamento e Metas")
+    
+    # Bloco 1: Painel de Disciplinas (Tabela real vinda da Home)
+    st.subheader("📊 Seu Desempenho Real")
+    if not df_estudo.empty:
+        df_estudo['tempo'] = pd.to_numeric(df_estudo['tempo'], errors='coerce').fillna(0)
+        df_estudo['acertos'] = pd.to_numeric(df_estudo['acertos'], errors='coerce').fillna(0)
+        df_estudo['total_q'] = pd.to_numeric(df_estudo['total_q'], errors='coerce').fillna(0)
+        painel = df_estudo.groupby("materia").agg({"tempo":"sum", "acertos":"sum", "total_q":"sum"}).reset_index()
+        painel["tempo_total"] = painel["tempo"].apply(formatar_tempo)
+        painel["% Acerto"] = (painel["acertos"]/painel["total_q"]*100).fillna(0).map("{:.1f}%".format)
+        st.dataframe(painel[["materia", "tempo_total", "% Acerto", "total_q"]], use_container_width=True, hide_index=True)
+
+    st.write("---")
+    
+    # Bloco 2: Calculadora de Metas (Cards)
+    st.subheader("⚙️ Definir Metas do Ciclo")
+    horas_semana = st.number_input("Horas disponíveis na semana", 5, 100, 20)
     
     dados_ciclo = []
-    st.subheader("📊 Ajuste de Pesos")
     for m in materias_list:
         with st.expander(f"Configurar: {m}"):
             c1, c2 = st.columns(2)
-            p = c1.select_slider(f"Peso", options=[1, 2, 3, 4, 5], value=3, key=f"p_{m}")
-            n = c2.select_slider(f"Nível", options=[1, 2, 3, 4, 5], value=3, key=f"n_{m}")
-            dados_ciclo.append({"materia": m, "fator": p/n, "horas": 0})
+            p = c1.select_slider(f"Peso no Edital", options=[1, 2, 3, 4, 5], value=3, key=f"p_{m}")
+            n = c2.select_slider(f"Sua Proficiência", options=[1, 2, 3, 4, 5], value=3, key=f"n_{m}")
+            dados_ciclo.append({"materia": m, "fator": p/n, "peso": p, "nivel": n})
 
     df_ciclo = pd.DataFrame(dados_ciclo)
     total_fator = df_ciclo["fator"].sum()
     df_ciclo["horas"] = (df_ciclo["fator"] / total_fator) * horas_semana
     
+    # Exibição dos CARDS de metas (recuperado)
+    st.write("### Meta de Horas por Matéria")
+    cols_ciclo = st.columns(3)
+    for idx, row in df_ciclo.iterrows():
+        tempo_fmt = decimal_para_horas(row['horas'])
+        with cols_ciclo[idx % 3]:
+            st.markdown(f'<div class="ciclo-card"><div style="font-size:14px; color:#3ec6a8; font-weight:bold;">{row["materia"]}</div><div style="font-size:24px; font-weight:bold; margin:10px 0;">{tempo_fmt}</div><div style="font-size:11px; color:#b0b3b8;">Peso: {row["peso"]} | Nível: {row["nivel"]}</div></div>', unsafe_allow_html=True)
+
     st.write("---")
-    st.subheader("🗓️ Sugestão de Ordem (Giro Semanal)")
-    
-    # Lógica de distribuição baseada na imagem enviada (7 dias)
-    # Ordenamos por peso para colocar as mais importantes no início/fim
+
+    # Bloco 3: Cronograma Sugerido (Estilo Imagem)
+    st.subheader("🗓️ Sugestão de Ordem Semanal")
     df_sorted = df_ciclo.sort_values(by="horas", ascending=False).reset_index()
-    
-    def get_mat(idx): 
-        return df_sorted.iloc[idx % len(df_sorted)]['materia'] if not df_sorted.empty else "-"
-    def get_time(idx):
-        return decimal_para_horas(df_sorted.iloc[idx % len(df_sorted)]['horas']/2) if not df_sorted.empty else "00h"
+    def g_m(i): return df_sorted.iloc[i % len(df_sorted)]['materia'] if not df_sorted.empty else "-"
 
     cronograma_html = f"""
     <table class="cronograma-table">
         <tr><th>Dia</th><th>Materia Principal</th><th>Giro / Complemento</th></tr>
-        <tr><td class="dia-num">1</td><td>{get_mat(0)}</td><td>{get_mat(len(df_sorted)-1)}</td></tr>
-        <tr><td class="dia-num">2</td><td>{get_mat(1)}</td><td>{get_mat(len(df_sorted)-2)}</td></tr>
-        <tr><td class="dia-num">3</td><td>{get_mat(2)}</td><td>{get_mat(len(df_sorted)-3)}</td></tr>
-        <tr><td class="dia-num">4</td><td>{get_mat(0)} (Revisão)</td><td>{get_mat(3)}</td></tr>
-        <tr><td class="dia-num">5</td><td>{get_mat(1)} (Revisão)</td><td>{get_mat(4)}</td></tr>
+        <tr><td class="dia-num">1</td><td>{g_m(0)}</td><td>{g_m(len(df_sorted)-1)}</td></tr>
+        <tr><td class="dia-num">2</td><td>{g_m(1)}</td><td>{g_m(len(df_sorted)-2)}</td></tr>
+        <tr><td class="dia-num">3</td><td>{g_m(2)}</td><td>{g_m(len(df_sorted)-3)}</td></tr>
+        <tr><td class="dia-num">4</td><td>{g_m(0)} (Revisão)</td><td>{g_m(3)}</td></tr>
+        <tr><td class="dia-num">5</td><td>{g_m(1)} (Revisão)</td><td>{g_m(4)}</td></tr>
         <tr><td class="dia-num">6</td><td>Língua Portuguesa</td><td>Discursiva / Estudo de Caso</td></tr>
-        <tr><td class="dia-num">7</td><td>{get_mat(0)}</td><td>Simulado / Revisão Geral</td></tr>
+        <tr><td class="dia-num">7</td><td>{g_m(0)}</td><td>Simulado / Revisão Geral</td></tr>
     </table>
     """
     st.markdown(cronograma_html, unsafe_allow_html=True)
-    st.caption("A ordem prioriza as matérias de maior peso nos dias 1, 2 e 7, intercalando com as demais.")
 
 # ---------------- GESTÃO DE DATOS (MANTIDO) ----------------
 elif page == "Gestão de Dados":
