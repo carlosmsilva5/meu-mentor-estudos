@@ -239,93 +239,16 @@ if page == "Home":
             st.plotly_chart(fig_line, use_container_width=True, config={'staticPlot': True})
 
 elif page == "Registrar Estudo":
-    st.title("📝 Registrar Nova Sessão")
-
-    # --- LÓGICA DO CRONÔMETRO ---
-    if 'cronometro_inicio' not in st.session_state:
-        st.session_state.cronometro_inicio = None
-    if 'tempo_decorrido' not in st.session_state:
-        st.session_state.tempo_decorrido = 0
-
-    col_cro1, col_cro2, col_cro3 = st.columns([1, 1, 2])
-    with col_cro1:
-        if st.button("▶️ Iniciar", use_container_width=True):
-            st.session_state.cronometro_inicio = pd.Timestamp.now()
-    with col_cro2:
-        if st.button("⏹️ Parar", use_container_width=True):
-            if st.session_state.cronometro_inicio:
-                fim = pd.Timestamp.now()
-                diff = (fim - st.session_state.cronometro_inicio).total_seconds() / 60
-                st.session_state.tempo_decorrido = round(diff)
-                st.session_state.cronometro_inicio = None
-
-    if st.session_state.cronometro_inicio:
-        st.write(f"⏳ Cronômetro rodando desde: {st.session_state.cronometro_inicio.strftime('%H:%M:%S')}")
-
-    st.divider()
-
-    # --- BUSCA DE DISCIPLINAS ---
-    lista_disciplinas = [
-        "Português", "Matemática e Raciocínio Lógico", "Informática", 
-        "Regimento Interno", "Dir. Constitucional", "Dir. Administrativo", 
-        "Contabilidade Geral", "Contabilidade Pública", 
-        "Administração Financeira Orçamentária", "Auditoria", "Estudo de Caso"
-    ]
-
-    # --- FORMULÁRIO ---
-    with st.form("form_registro_v4", clear_on_submit=True):
-        c1, c2 = st.columns(2)
-        with c1:
-            data_estudo = st.date_input("Data", pd.Timestamp.today())
-            disc_sel = st.selectbox("Disciplina", lista_disciplinas)
-        with c2:
-            tipo = st.radio("Tipo", ["Teoria", "Questões", "Revisão"], horizontal=True)
-            humor_sel = st.select_slider("Humor/Foco", options=["Exausto", "Cansado", "Neutro", "Focado"], value="Neutro")
-
-        st.divider()
-        
-        col_p1, col_p2, col_t = st.columns(3)
-        with col_p1:
-            p_ini = st.number_input("Pág. Inicial", min_value=0, value=0)
-        with col_p2:
-            p_fim = st.number_input("Pág. Final", min_value=0, value=0)
-        with col_t:
-            # Puxa o tempo do cronômetro automaticamente ou aceita manual
-            tempo_final = st.number_input("Minutos Totais", min_value=0, value=int(st.session_state.tempo_decorrido))
-
-        col_q1, col_q2 = st.columns(2)
-        with col_q1:
-            t_q = st.number_input("Total Questões", min_value=0, value=0)
-        with col_q2:
-            t_a = st.number_input("Acertos", min_value=0, value=0)
-
-        obs_text = st.text_area("Observações")
-        
-        btn_gravar = st.form_submit_button("Confirmar e Salvar", use_container_width=True)
-
-    if btn_gravar:
-        total_paginas = p_fim - p_ini if p_fim >= p_ini else 0
-        
-        dados_sessao = {
-            "data": data_estudo.strftime('%d/%m/%Y'),
-            "materia": disc_sel,
-            "tipo_estudo": tipo,
-            "tempo": int(tempo_final),
-            "acertos": int(t_a),
-            "total_q": int(t_q),
-            "paginas": int(total_paginas),
-            "humor": humor_sel,
-            "obs": obs_text
-        }
-        
-        try:
-            # Chama a função de salvar
-            append_data("progresso", dados_sessao)
-            st.success(f"✅ Registrado na planilha! {disc_sel} - {tempo_final}min")
-            st.session_state.tempo_decorrido = 0 # Reseta cronômetro após salvar
-            st.balloons()
-        except Exception as e:
-            st.error(f"Erro ao enviar para o Google Sheets: {e}")
+    st.title("Novo Registro")
+    with st.form("form_registro", clear_on_submit=True):
+        materia = st.selectbox("Matéria", materias_list)
+        tipo = st.selectbox("Tipo", ["Teoria Novo", "Revisão", "Questões"])
+        tempo = st.number_input("Tempo (min)", 0)
+        cq1, cq2 = st.columns(2)
+        q_t, q_a = cq1.number_input("Qtd Questões", 0), cq2.number_input("Acertos", 0)
+        if st.form_submit_button("Salvar"):
+            save_data("progresso", pd.DataFrame([{"data": datetime.now().strftime("%d/%m/%Y"), "materia": materia, "tipo_estudo": tipo, "tempo": tempo, "acertos": q_a, "total_q": q_t}]))
+            st.rerun()
 
 elif page == "Caderno de Erros":
     st.title("❌ Caderno de Erros Estratégico")
