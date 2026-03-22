@@ -173,25 +173,48 @@ elif page == "Registrar Estudo":
 
 elif page == "Caderno de Erros":
     st.title("❌ Caderno de Erros Estratégico")
+    
+    # Lista de motivos de erro de alta performance
+    tipos_erro = ["Atenção / Bobeira", "Teoria não vista", "Interpretação de Texto", "Pegadinha da Banca", "Jurisprudência / Súmula"]
+    
     with st.form("form_erro", clear_on_submit=True):
         m_e = st.selectbox("Matéria", materias_list)
+        tipo_e = st.selectbox("Motivo do Erro", tipos_erro) # NOVO CAMPO DE SELEÇÃO
         link_e = st.text_input("Link ou Referência da Questão")
         obs_e = st.text_area("Insight: O que você aprendeu com esse erro?")
+        
         if st.form_submit_button("Registrar no Caderno"):
-            novo_e = pd.DataFrame([{"data": datetime.now().strftime("%d/%m/%Y"), "materia": m_e, "tipo": "Atenção", "link": link_e, "comentario": obs_e}])
+            # Agora a variável 'tipo' recebe a sua escolha (tipo_e) em vez de ser fixa
+            novo_e = pd.DataFrame([{"data": datetime.now().strftime("%d/%m/%Y"), "materia": m_e, "tipo": tipo_e, "link": link_e, "comentario": obs_e}])
             
             df_atual_e = conn.read(worksheet="caderno_erros").dropna(how='all')
-            # Garante que as colunas existam mesmo se a planilha for nova
+            # Garante que as colunas existam
             if df_atual_e.empty:
                 df_atual_e = pd.DataFrame(columns=["data", "materia", "tipo", "link", "comentario"])
                 
             conn.update(worksheet="caderno_erros", data=pd.concat([df_atual_e, novo_e], ignore_index=True))
             st.cache_data.clear()
-            st.success("Erro catalogado com sucesso!")
+            st.success(f"Erro de '{tipo_e}' catalogado com sucesso!")
             st.rerun()
 
     st.divider()
     st.subheader("📚 Seus Erros Registrados")
+    
+    if not df_erros.empty:
+        st.dataframe(
+            df_erros, 
+            use_container_width=True, 
+            hide_index=True,
+            column_config={
+                "data": "Data",
+                "materia": "Matéria",
+                "tipo": st.column_config.TextColumn("Motivo"), # Mostrando o motivo na tabela
+                "link": st.column_config.LinkColumn("Link da Questão"),
+                "comentario": st.column_config.TextColumn("Insight / Aprendizado")
+            }
+        )
+    else:
+        st.info("Você ainda não registrou nenhum erro no caderno. Bom trabalho (ou vá fazer mais questões!) 😉")
     
     # Exibe a tabela visualmente logo abaixo do formulário
     if not df_erros.empty:
