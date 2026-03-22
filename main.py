@@ -133,11 +133,47 @@ if page == "Home":
         col_grafico1, col_grafico2 = st.columns(2)
         
         with col_grafico1:
-            st.subheader("Distribuição por Matéria")
-            painel = df_estudo.groupby("materia")["tempo_num"].sum().reset_index()
-            fig_donut = px.pie(painel, values='tempo_num', names='materia', hole=0.5, color_discrete_sequence=px.colors.sequential.Teal)
-            fig_donut.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='white'))
-            st.plotly_chart(fig_donut, use_container_width=True)
+            st.subheader("Desempenho por Disciplina")
+            painel_disciplina = df_estudo.groupby("materia").agg(
+                tempo_total=("tempo_num", "sum"),
+                q_total=("total_q_num", "sum"),
+                q_acertos=("acertos_num", "sum")
+            ).reset_index()
+            
+            painel_disciplina["aproveitamento"] = (painel_disciplina["q_acertos"] / painel_disciplina["q_total"] * 100).fillna(0)
+            
+            fig_radar = px.line_polar(
+                painel_disciplina, 
+                r='aproveitamento', 
+                theta='materia', 
+                line_close=True,
+                markers=True,
+                color_discrete_sequence=['#3ec6a8']
+            )
+            fig_radar.update_traces(fill='toself')
+            fig_radar.update_layout(
+                polar=dict(
+                    radialaxis=dict(visible=True, range=[0, 100], color='white', gridcolor='#4f4f4f'),
+                    angularaxis=dict(color='white', gridcolor='#4f4f4f')
+                ),
+                paper_bgcolor='rgba(0,0,0,0)', 
+                plot_bgcolor='rgba(0,0,0,0)', 
+                font=dict(color='white'),
+                margin=dict(l=40, r=40, t=20, b=20)
+            )
+            st.plotly_chart(fig_radar, use_container_width=True, config={'staticPlot': True})
+            
+            st.markdown("#### Detalhamento das Matérias")
+            tabela_exibicao = painel_disciplina.copy()
+            tabela_exibicao["Tempo Gasto"] = tabela_exibicao["tempo_total"].apply(formatar_tempo)
+            tabela_exibicao["Desempenho"] = tabela_exibicao["aproveitamento"].map("{:.1f}%".format)
+            tabela_exibicao.rename(columns={"materia": "Matéria", "q_total": "Questões"}, inplace=True)
+            
+            st.dataframe(
+                tabela_exibicao[["Matéria", "Tempo Gasto", "Desempenho", "Questões"]], 
+                use_container_width=True, 
+                hide_index=True
+            )
 
         with col_grafico2:
             st.subheader("Evolução (Últimos 7 Dias)")
@@ -145,22 +181,20 @@ if page == "Home":
             evolucao = df_estudo.groupby('data_fmt')["tempo_num"].sum().reset_index().sort_values('data_fmt').tail(7)
             evolucao['data_str'] = evolucao['data_fmt'].dt.strftime('%d/%m')
             
-            # Convertendo os minutos para horas (arredondando para 1 casa decimal)
             evolucao['horas_estudo'] = (evolucao['tempo_num'] / 60).round(1)
+            evolucao['texto_tempo'] = evolucao['tempo_num'].apply(formatar_tempo)
             
-            # Criando o gráfico de linha com a escala em horas
             fig_line = px.line(
                 evolucao, 
                 x='data_str', 
                 y='horas_estudo', 
-                text='horas_estudo', 
+                text='texto_tempo', 
                 markers=True, 
                 labels={'horas_estudo': 'Horas', 'data_str': 'Data'}, 
                 color_discrete_sequence=['#3ec6a8']
             )
             
-            # Ajustando a posição e adicionando um "h" na frente do número (ex: 2.5h)
-            fig_line.update_traces(textposition="top center", texttemplate='%{text}h') 
+            fig_line.update_traces(textposition="top center") 
             fig_line.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='white'))
             
             st.plotly_chart(fig_line, use_container_width=True, config={'staticPlot': True})
