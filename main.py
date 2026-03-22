@@ -308,8 +308,24 @@ elif page == "Caderno de Erros":
         st.info("Você ainda não registrou nenhum erro no caderno. Bom trabalho (ou vá fazer mais questões!) 😉")
     
    
-elif page == "Ciclo de Estudos":
-    st.title("🎯 Planejamento do Ciclo")
+elif page == "🎯 Ciclo de Estudos":
+    st.title("🎯 Cronograma da Semana")
+    
+    if not df_cronograma.empty:
+        # Exibe a tabela exatamente como você editou na Gestão de Dados
+        st.markdown("""
+        <style>
+            .crono-view { width: 100%; border-collapse: collapse; background: #3a3b3c; border-radius: 8px; }
+            .crono-view td, .crono-view th { padding: 12px; border: 1px solid #4f4f4f; text-align: center; }
+            .crono-view th { background: #202225; color: #3ec6a8; }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        # Converte o DataFrame em HTML para manter o estilo visual
+        st.write("### 🗓️ Sua Escala de Estudos")
+        st.dataframe(df_cronograma, use_container_width=True, hide_index=True)
+    else:
+        st.warning("Nenhum cronograma encontrado. Vá em 'Gestão de Dados' para criar sua escala.")
     
     giro = calcular_giro_atual(df_estudo)
     st.markdown(f'<div class="giro-badge">🔄 Você está no Giro {giro} do Ciclo Global</div>', unsafe_allow_html=True)
@@ -383,12 +399,23 @@ elif page == "Gestão de Dados":
     t1, t2, t3, t4 = st.tabs(["🗓️ Editar Cronograma", "📚 Matérias", "📝 Histórico", "❌ Erros"])
     
     with t1:
-        st.markdown("### Personalize sua semana de estudos")
-        st.write("Edite diretamente na tabela abaixo. Você pode deixar campos em branco ('-') caso estude apenas uma ou duas matérias no dia.")
+        st.markdown("### 🗓️ Personalize sua semana de estudos")
+        st.info("As alterações feitas aqui aparecerão na aba 'Ciclo de Estudos'.")
+        
+        # Se o cronograma estiver vazio, cria um modelo inicial
+        if df_cronograma.empty:
+            df_cronograma = pd.DataFrame([
+                {"Dia": "Segunda", "Materia 1": "-", "Tempo (min)": 60, "Materia 2": "-", "Tempo 2 (min)": 60},
+                {"Dia": "Terça", "Materia 1": "-", "Tempo (min)": 60, "Materia 2": "-", "Tempo 2 (min)": 60}
+            ])
+
         ed_crono = st.data_editor(df_cronograma, num_rows="dynamic", key="ed_crono", use_container_width=True, hide_index=True)
+        
         if st.button("Salvar Cronograma", type="primary"):
+            # O comando abaixo limpa o cache ANTES de salvar para garantir a atualização
+            st.cache_data.clear()
             overwrite_data("cronograma", ed_crono)
-            st.success("Cronograma atualizado com sucesso!")
+            st.success("Cronograma vinculado com sucesso!")
             st.rerun()
 
     with t2:
