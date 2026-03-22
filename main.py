@@ -240,94 +240,92 @@ if page == "Home":
 
 elif page == "Registrar Estudo":
     st.title("📝 Registrar Nova Sessão")
-    
-  # 1. BUSCA AS DISCIPLINAS (Tenta a planilha, se falhar usa a sua lista fixa)
-    try:
-        df_materias_atu = conn.read(worksheet="materias")
-        lista_disciplinas = df_materias_atu['materia'].dropna().unique().tolist()
-    except:
-        # Lista fixa corrigida com aspas para evitar o SyntaxError
-        lista_disciplinas = [
-            "Português", 
-            "Matemática e Raciocínio Lógico", 
-            "Informática", 
-            "Regimento Interno", 
-            "Dir. Constitucional", 
-            "Dir. Administrativo", 
-            "Contabilidade Geral", 
-            "Contabilidade Pública", 
-            "Administração Financeira Orçamentária", 
-            "Auditoria", 
-            "Estudo de Caso"
-        ]
 
-    if not lista_disciplinas:
-        lista_disciplinas = ["Nenhuma Disciplina Cadastrada"]
+    # --- LÓGICA DO CRONÔMETRO ---
+    if 'cronometro_inicio' not in st.session_state:
+        st.session_state.cronometro_inicio = None
+    if 'tempo_decorrido' not in st.session_state:
+        st.session_state.tempo_decorrido = 0
 
-    # 2. Campos de entrada (Fora do form para permitir cálculo em tempo real)
-    col1, col2 = st.columns(2)
-    with col1:
-        data_estudo = st.date_input("Data", pd.Timestamp.today())
-        disciplina_selecionada = st.selectbox("Disciplina", lista_disciplinas)
-    
-    with col2:
-        tipo_estudo = st.radio("Tipo de Estudo", ["Teoria", "Questões", "Revisão"], horizontal=True)
-        humor = st.select_slider("Foco / Humor", options=["Exausto", "Cansado", "Neutro", "Focado"], value="Neutro")
+    col_cro1, col_cro2, col_cro3 = st.columns([1, 1, 2])
+    with col_cro1:
+        if st.button("▶️ Iniciar", use_container_width=True):
+            st.session_state.cronometro_inicio = pd.Timestamp.now()
+    with col_cro2:
+        if st.button("⏹️ Parar", use_container_width=True):
+            if st.session_state.cronometro_inicio:
+                fim = pd.Timestamp.now()
+                diff = (fim - st.session_state.cronometro_inicio).total_seconds() / 60
+                st.session_state.tempo_decorrido = round(diff)
+                st.session_state.cronometro_inicio = None
 
-    st.divider()
-    
-    # SEÇÃO DE PÁGINAS COM CÁLCULO AUTOMÁTICO
-    st.subheader("📖 Progresso na Leitura")
-    c_p1, c_p2, c_p3 = st.columns(3)
-    with c_p1:
-        p_ini = st.number_input("Página Inicial", min_value=0, value=0, key="p_ini")
-    with c_p2:
-        p_fim = st.number_input("Página Final", min_value=0, value=0, key="p_fim")
-    
-    # O cálculo agora acontece instantaneamente na tela
-    total_p_lidas = p_fim - p_ini if p_fim >= p_ini else 0
-    with c_p3:
-        st.metric("Total de Páginas", total_p_lidas)
+    if st.session_state.cronometro_inicio:
+        st.write(f"⏳ Cronômetro rodando desde: {st.session_state.cronometro_inicio.strftime('%H:%M:%S')}")
 
     st.divider()
 
-    # 3. FORMULÁRIO FINAL PARA SALVAMENTO
-    with st.form("form_final_registro", clear_on_submit=True):
-        col_t, col_q1, col_q2 = st.columns(3)
+    # --- BUSCA DE DISCIPLINAS ---
+    lista_disciplinas = [
+        "Português", "Matemática e Raciocínio Lógico", "Informática", 
+        "Regimento Interno", "Dir. Constitucional", "Dir. Administrativo", 
+        "Contabilidade Geral", "Contabilidade Pública", 
+        "Administração Financeira Orçamentária", "Auditoria", "Estudo de Caso"
+    ]
+
+    # --- FORMULÁRIO ---
+    with st.form("form_registro_v4", clear_on_submit=True):
+        c1, c2 = st.columns(2)
+        with c1:
+            data_estudo = st.date_input("Data", pd.Timestamp.today())
+            disc_sel = st.selectbox("Disciplina", lista_disciplinas)
+        with c2:
+            tipo = st.radio("Tipo", ["Teoria", "Questões", "Revisão"], horizontal=True)
+            humor_sel = st.select_slider("Humor/Foco", options=["Exausto", "Cansado", "Neutro", "Focado"], value="Neutro")
+
+        st.divider()
+        
+        col_p1, col_p2, col_t = st.columns(3)
+        with col_p1:
+            p_ini = st.number_input("Pág. Inicial", min_value=0, value=0)
+        with col_p2:
+            p_fim = st.number_input("Pág. Final", min_value=0, value=0)
         with col_t:
-            tempo_input = st.number_input("Minutos Estudados", min_value=0, step=5)
-        with col_q1:
-            t_quest = st.number_input("Total Questões", min_value=0, value=0)
-        with col_q2:
-            t_acer = st.number_input("Acertos", min_value=0, value=0)
+            # Puxa o tempo do cronômetro automaticamente ou aceita manual
+            tempo_final = st.number_input("Minutos Totais", min_value=0, value=int(st.session_state.tempo_decorrido))
 
-        obs = st.text_area("Notas da sessão (opcional)")
+        col_q1, col_q2 = st.columns(2)
+        with col_q1:
+            t_q = st.number_input("Total Questões", min_value=0, value=0)
+        with col_q2:
+            t_a = st.number_input("Acertos", min_value=0, value=0)
+
+        obs_text = st.text_area("Observações")
         
-        btn_salvar = st.form_submit_button("Confirmar e Gravar no Histórico", use_container_width=True)
+        btn_gravar = st.form_submit_button("Confirmar e Salvar", use_container_width=True)
+
+    if btn_gravar:
+        total_paginas = p_fim - p_ini if p_fim >= p_ini else 0
         
-    if btn_salvar:
-        if disciplina_selecionada == "Nenhuma Disciplina Cadastrada":
-            st.error("⚠️ Erro: Nenhuma disciplina encontrada. Cadastre-as na aba Gestão de Dados.")
-        else:
-            # Monta o dicionário com os dados capturados
-            nova_sessao = {
-                "data": data_estudo.strftime('%d/%m/%Y'),
-                "materia": disciplina_selecionada,
-                "tipo_estudo": tipo_estudo,
-                "tempo": int(tempo_input),
-                "acertos": int(t_acer),
-                "total_q": int(t_quest),
-                "paginas": int(total_p_lidas), # Usa o cálculo feito acima
-                "humor": humor,
-                "obs": obs
-            }
-            
-            try:
-                append_data("progresso", nova_sessao)
-                st.success(f"✅ Sucesso! {total_p_lidas} páginas de {disciplina_selecionada} registradas.")
-                st.balloons()
-            except Exception as e:
-                st.error(f"Erro técnico ao salvar: {e}")
+        dados_sessao = {
+            "data": data_estudo.strftime('%d/%m/%Y'),
+            "materia": disc_sel,
+            "tipo_estudo": tipo,
+            "tempo": int(tempo_final),
+            "acertos": int(t_a),
+            "total_q": int(t_q),
+            "paginas": int(total_paginas),
+            "humor": humor_sel,
+            "obs": obs_text
+        }
+        
+        try:
+            # Chama a função de salvar
+            append_data("progresso", dados_sessao)
+            st.success(f"✅ Registrado na planilha! {disc_sel} - {tempo_final}min")
+            st.session_state.tempo_decorrido = 0 # Reseta cronômetro após salvar
+            st.balloons()
+        except Exception as e:
+            st.error(f"Erro ao enviar para o Google Sheets: {e}")
 
 elif page == "Caderno de Erros":
     st.title("❌ Caderno de Erros Estratégico")
