@@ -139,7 +139,7 @@ if page == "Home":
             fig_donut.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='white'))
             st.plotly_chart(fig_donut, use_container_width=True)
 
-  with col_grafico2:
+ with col_grafico2:
             st.subheader("Evolução (Últimos 7 Dias)")
             df_estudo['data_fmt'] = pd.to_datetime(df_estudo['data'], format='%d/%m/%Y', errors='coerce')
             evolucao = df_estudo.groupby('data_fmt')["tempo_num"].sum().reset_index().sort_values('data_fmt').tail(7)
