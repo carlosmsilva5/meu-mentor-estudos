@@ -130,4 +130,10 @@ elif page == "📓 Caderno de Erros":
         link = st.text_input("Link da Questão")
         comentario = st.text_area("Insight do Erro")
         if st.form_submit_button("Salvar Erro"):
-            save("caderno_erros", pd.DataFrame([{"data": datetime.now().strftime("%d/%m
+            save("caderno_erros", pd.DataFrame([{"data": datetime.now().strftime("%d/%m/%Y"), "materia": materia, "tipo": tipo, "link": link, "comentario": comentario}]))
+            st.rerun()
+
+    if not df_erros.empty:
+        for _, row in df_erros.iterrows():
+            st.markdown(f'<div class="card"><b>{row["materia"]}</b> | {row["tipo"]}<br>{row["comentario"]}<br><a href="{row["link"]}">🔗 Link</a></div>', unsafe_allow_html=True)
+            
