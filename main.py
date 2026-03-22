@@ -430,5 +430,17 @@ elif page == "Gestão de Dados":
                 overwrite_data("caderno_erros", ed_err)
                 st.success("Erros atualizados!")
                 st.rerun()
+            
+            st.divider()
+            
+            # Nova seção: Zona de Perigo para zerar o Caderno de Erros
+            with st.expander("⚠️ Zona de Perigo (Limpar Caderno de Erros)"):
+                st.warning("Atenção: Isso apagará todos os insights e links de questões registrados. Esta ação não pode ser desfeita.")
+                if st.button("🚨 Sim, Quero Limpar Todo o Caderno de Erros", key="btn_zerar_erros"):
+                    # Cria um DataFrame vazio com as colunas corretas da aba de erros
+                    df_vazio_erros = pd.DataFrame(columns=["data", "materia", "tipo", "link", "comentario"])
+                    overwrite_data("caderno_erros", df_vazio_erros)
+                    st.success("Caderno de erros limpo com sucesso!")
+                    st.rerun()
         else:
             st.warning("O seu caderno de erros está vazio no momento. Registre novos erros na aba 'Caderno de Erros'.")
