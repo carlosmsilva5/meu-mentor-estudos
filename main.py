@@ -7,28 +7,17 @@ from datetime import datetime, timedelta
 import time
 
 # --- CONFIGURAÇÃO DE LAYOUT ---
-st.set_page_config(page_title="Dashboard de Estudos", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="Mentor Elite Pro", layout="wide", initial_sidebar_state="collapsed")
 
-# --- CSS PARA ESTILIZAÇÃO "GRAN/INVESTIDA" ---
+# --- CSS PROFISSIONAL ---
 st.markdown("""
     <style>
-    .stApp { background-color: #121212; color: #E0E0E0; }
-    [data-testid="stHeader"] { background: rgba(0,0,0,0); }
-    
-    /* Cards de Métricas */
-    .metric-card {
-        background-color: #1E1E1E;
-        padding: 20px;
-        border-radius: 10px;
-        border: 1px solid #333;
-        text-align: left;
-    }
-    .metric-title { color: #888; font-size: 12px; font-weight: bold; text-transform: uppercase; }
-    .metric-value { color: #FFF; font-size: 24px; font-weight: bold; margin-top: 5px; }
-    
-    /* Estilo Tabela e Heatmap */
-    .section-title { font-size: 14px; font-weight: bold; margin-bottom: 10px; color: #BBB; }
-    .timer-digital { font-family: 'monospace'; font-size: 40px; color: #00FF41; text-align: center; background: #000; border-radius: 10px; padding: 10px; border: 1px solid #333; }
+    .stApp { background-color: #0D1117; color: #C9D1D9; }
+    .metric-card { background-color: #161B22; padding: 15px; border-radius: 8px; border: 1px solid #30363D; }
+    .metric-title { color: #8B949E; font-size: 12px; font-weight: bold; }
+    .metric-value { color: #F0F6FC; font-size: 22px; font-weight: bold; }
+    .timer-digital { font-family: 'Courier New', monospace; font-size: 50px; color: #39D353; text-align: center; background: #000; border-radius: 10px; padding: 10px; border: 1px solid #30363D; text-shadow: 0 0 10px #26A641; }
+    .card-erro { background-color: #161B22; padding: 12px; border-radius: 8px; border-left: 4px solid #F85149; margin-bottom: 8px; border-top: 1px solid #30363D; border-right: 1px solid #30363D; border-bottom: 1px solid #30363D; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -38,90 +27,77 @@ def carregar_dados(aba):
     try: return conn.read(worksheet=aba, ttl=0).dropna(how='all')
     except: return pd.DataFrame()
 
+def salvar_dados(aba, dados_df):
+    df_atual = carregar_dados(aba)
+    df_novo = pd.concat([df_atual, dados_df], ignore_index=True)
+    conn.update(worksheet=aba, data=df_novo)
+    st.cache_data.clear()
+
 # --- CARREGAMENTO ---
 df_p = carregar_dados("progresso")
 df_config = carregar_dados("config")
 df_erros = carregar_dados("caderno_erros")
 
+concurso = df_config["concurso"].iloc[0] if not df_config.empty else "Objetivo: Federal"
 materias_list = str(df_config["materias"].iloc[0]).split(",") if not df_config.empty else ["Português"]
 
-# --- SIDEBAR (CONFIGURAÇÕES RÁPIDAS) ---
-with st.sidebar:
-    st.title("⚙️ Ajustes")
-    if st.button("🔄 Atualizar Dados"):
-        st.cache_data.clear()
-        st.rerun()
+# --- TABS PRINCIPAIS ---
+tab_home, tab_erros, tab_config = st.tabs(["🏠 Dashboard Principal", "📓 Caderno de Erros", "⚙️ Config"])
 
-# --- HOME (FORMATO DA IMAGEM) ---
-st.subheader("Home")
+# --- TAB HOME (LAYOUT SOLICITADO) ---
+with tab_home:
+    # 1. MÉTRICAS NO TOPO
+    m1, m2, m3, m4 = st.columns(4)
+    with m1:
+        total_m = df_p['tempo'].sum() if not df_p.empty else 0
+        st.markdown(f'<div class="metric-card"><div class="metric-title">TEMPO TOTAL</div><div class="metric-value">{int(total_m//60)}h {int(total_m%60)}min</div></div>', unsafe_allow_html=True)
+    with m2:
+        acc = (df_p['acertos'].sum() / df_p['total_q'].sum() * 100) if not df_p.empty and df_p['total_q'].sum() > 0 else 0
+        st.markdown(f'<div class="metric-card"><div class="metric-title">APROVEITAMENTO</div><div class="metric-value">{acc:.1f}%</div></div>', unsafe_allow_html=True)
+    with m3:
+        pags = df_p['paginas'].sum() if not df_p.empty else 0
+        st.markdown(f'<div class="metric-card"><div class="metric-title">PÁGINAS LIDAS</div><div class="metric-value">{int(pags)}</div></div>', unsafe_allow_html=True)
+    with m4:
+        st.markdown(f'<div class="metric-card"><div class="metric-title">STATUS</div><div class="metric-value" style="color:#39D353">ATIVO</div></div>', unsafe_allow_html=True)
 
-# 1. LINHA DE MÉTRICAS (TOP CARDS)
-m1, m2, m3, m4 = st.columns(4)
+    st.write("")
 
-total_minutos = df_p['tempo'].sum() if not df_p.empty else 0
-horas = int(total_minutos // 60)
-mins = int(total_minutos % 60)
-
-with m1:
-    st.markdown(f'<div class="metric-card"><div class="metric-title">Tempo de Estudo</div><div class="metric-value">{horas}h{mins:02d}min</div></div>', unsafe_allow_html=True)
-with m2:
-    acertos = df_p['acertos'].sum() if not df_p.empty else 0
-    erros = (df_p['total_q'].sum() - acertos) if not df_p.empty else 0
-    st.markdown(f'<div class="metric-card"><div class="metric-title">Desempenho</div><div class="metric-value">{acertos} Acertos / {erros} Erros</div></div>', unsafe_allow_html=True)
-with m3:
-    perc = (acertos / df_p['total_q'].sum() * 100) if not df_p.empty and df_p['total_q'].sum() > 0 else 0
-    st.markdown(f'<div class="metric-card"><div class="metric-title">Aproveitamento Geral</div><div class="metric-value">{perc:.1f}%</div></div>', unsafe_allow_html=True)
-with m4:
-    st.markdown(f'<div class="metric-card"><div class="metric-title">Frase do Dia</div><div style="font-style: italic; font-size: 13px; margin-top:5px;">"Grandes coisas nunca vieram da zona de conforto."</div></div>', unsafe_allow_html=True)
-
-st.write("")
-
-# 2. SEÇÃO DE CONSTÂNCIA (HEATMAP)
-st.markdown('<div class="section-title">CONSTÂNCIA NOS ESTUDOS</div>', unsafe_allow_html=True)
-if not df_p.empty:
-    df_p['data_dt'] = pd.to_datetime(df_p['data'], format='%d/%m/%Y')
-    df_daily = df_p.groupby('data_dt')['tempo'].sum().reset_index()
+    # 2. HEATMAP (GRADE COMPLETA DE 365 DIAS)
+    st.markdown("**CONSTÂNCIA ANUAL**")
     hoje = datetime.now()
-    datas_ano = pd.date_range(start=datetime(hoje.year, 1, 1), end=hoje + timedelta(days=30))
-    df_heat = pd.DataFrame({'data_dt': datas_ano}).merge(df_daily, on='data_dt', how='left').fillna(0)
+    inicio_ano = datetime(hoje.year, 1, 1)
+    # Criamos a grade completa do ano
+    all_days = pd.date_range(start=inicio_ano, end=inicio_ano + timedelta(days=364))
+    df_full_year = pd.DataFrame({'data_dt': all_days})
     
+    if not df_p.empty:
+        df_p['data_dt'] = pd.to_datetime(df_p['data'], format='%d/%m/%Y')
+        df_daily = df_p.groupby('data_dt')['tempo'].sum().reset_index()
+        df_heat = df_full_year.merge(df_daily, on='data_dt', how='left').fillna(0)
+    else:
+        df_heat = df_full_year.assign(tempo=0)
+
+    df_heat['week'] = df_heat['data_dt'].dt.isocalendar().week
+    df_heat['day'] = df_heat['data_dt'].dt.weekday # 0=Segunda, 6=Domingo
+
     fig_heat = go.Figure(data=go.Heatmap(
-        z=df_heat['tempo'], x=df_heat['data_dt'].dt.isocalendar().week, y=df_heat['data_dt'].dt.weekday,
-        colorscale=[[0, '#21262D'], [0.1, '#0E4429'], [1, '#39D353']], showscale=False, xgap=3, ygap=3
+        z=df_heat['tempo'], x=df_heat['week'], y=df_heat['day'],
+        colorscale=[[0, '#161B22'], [0.1, '#0E4429'], [0.5, '#26A641'], [1, '#39D353']],
+        showscale=False, xgap=3, ygap=3, hovertemplate='Data: %{customdata}<br>Minutos: %{z}<extra></extra>',
+        customdata=df_heat['data_dt'].dt.strftime('%d/%m')
     ))
-    fig_heat.update_layout(height=150, margin=dict(t=0, b=0, l=0, r=0), 
-                          xaxis=dict(showgrid=False, showticklabels=False), 
-                          yaxis=dict(showgrid=False, tickvals=[0,2,4,6], ticktext=['S','Q','Q','D'], autorange="reversed"),
-                          paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+    fig_heat.update_layout(
+        height=180, margin=dict(t=5, b=5, l=0, r=0),
+        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+        yaxis=dict(showgrid=False, zeroline=False, tickvals=[0,2,4,6], ticktext=['S','Q','Q','D'], autorange="reversed"),
+        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
+    )
     st.plotly_chart(fig_heat, use_container_width=True)
 
-st.write("")
+    # 3. PAINEL INFERIOR (DISCIPLINAS + REGISTRO)
+    c_left, c_right = st.columns([1.5, 1])
 
-# 3. PAINEL DE DISCIPLINAS E REGISTRO
-col_left, col_right = st.columns([2, 1])
-
-with col_left:
-    st.markdown('<div class="section-title">PAINEL DE DISCIPLINAS</div>', unsafe_allow_html=True)
-    if not df_p.empty:
-        df_tab = df_p.groupby('materia').agg({'tempo': 'sum', 'acertos': 'sum', 'total_q': 'sum'}).reset_index()
-        df_tab['%'] = (df_tab['acertos'] / df_tab['total_q'] * 100).fillna(0).map('{:.1f}%'.format)
-        df_tab['Tempo'] = (df_tab['tempo'] / 60).map('{:.1f}h'.format)
-        st.dataframe(df_tab[['materia', 'Tempo', 'acertos', 'total_q', '%']], use_container_width=True, hide_index=True)
-    else:
-        st.info("Aguardando registros...")
-
-with col_right:
-    st.markdown('<div class="section-title">ADICIONAR ESTUDO</div>', unsafe_allow_html=True)
-    with st.expander("⏱️ Cronômetro e Registro", expanded=True):
-        mat = st.selectbox("Disciplina", materias_list)
-        t_sel = st.select_slider("Minutos", options=[0, 15, 30, 45, 60, 90, 120, 180], value=30)
-        
-        if st.button("💾 Salvar Registro"):
-            # Função de salvar...
-            st.success("Salvo!")
-            st.rerun()
-            
-    st.markdown('<div class="section-title">CADERNO DE ERROS</div>', unsafe_allow_html=True)
-    if st.button("➕ Novo Erro"):
-        # Navegação ou modal para erros
-        pass
+    with c_left:
+        st.markdown("**DESEMPENHO POR DISCIPLINA**")
+        if not df_p.empty:
+            df_display = df_p.groupby('materia').agg({'tempo':'
