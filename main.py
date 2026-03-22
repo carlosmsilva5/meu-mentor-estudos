@@ -14,8 +14,7 @@ st.markdown("""
     .stApp { background-color: #0E1117; color: #FAFAFA; }
     .card-erro { background-color: #1C2128; padding: 15px; border-radius: 10px; border-left: 5px solid #E63946; margin-bottom: 10px; border: 1px solid #30363D; }
     .status-revisao { padding: 15px; border-radius: 10px; border: 1px solid #FFA500; background-color: #332100; color: #FFCC66; font-weight: bold; margin-bottom: 20px; }
-    /* Estilo do Cronómetro Digital */
-    .timer-digital { font-family: 'Courier New', Courier, monospace; font-size: 70px; font-weight: bold; color: #00FF41; text-align: center; background: #000; padding: 20px; border-radius: 15px; border: 2px solid #30363D; margin-bottom: 10px; text-shadow: 0 0 10px #00FF41; }
+    .timer-digital { font-family: 'Courier New', Courier, monospace; font-size: 70px; font-weight: bold; color: #00FF41; text-align: center; background: #000; padding: 20px; border-radius: 15px; border: 2px solid #30363D; text-shadow: 0 0 10px #00FF41; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -43,82 +42,96 @@ st.title(f"🎯 {concurso}")
 
 tabs = st.tabs(["🎯 Sessão de Estudo", "📊 Performance & Heatmap", "📓 Caderno de Erros", "⚙️ Config"])
 
-# --- ABA 1: SESSÃO (COM CRONÓMETRO DIGITAL) ---
+# --- ABA 1: SESSÃO (SELETOR DE TEMPO + CRONÔMETRO) ---
 with tabs[0]:
     col_m, col_g = st.columns(2)
     materia = col_m.selectbox("Disciplina:", materias_list)
-    giro = col_g.number_input("Giro/Semana Atual:", min_value=1, step=1, value=1)
+    giro = col_g.number_input("Giro Atual:", min_value=1, value=1)
     
     if giro > 1:
         st.markdown(f'<div class="status-revisao">🔄 MODO REVISÃO: {materia} (Giro {giro})</div>', unsafe_allow_html=True)
 
-    with st.expander("⏳ Cronómetro Digital", expanded=True):
-        t_foco = st.select_slider("Minutos:", options=[15, 25, 30, 45, 60, 90, 120], value=30)
+    with st.expander("⏳ Cronômetro Digital", expanded=True):
+        t_foco_opt = st.select_slider("Definir Tempo de Foco (Min):", options=[15, 25, 30, 45, 60, 90, 120], value=30)
         display_timer = st.empty()
-        
-        col_btn1, col_btn2 = st.columns(2)
-        if col_btn1.button("▶️ INICIAR FOCO"):
-            for t in range(t_foco * 60, -1, -1):
+        if st.button("▶️ INICIAR"):
+            for t in range(t_foco_opt * 60, -1, -1):
                 mins, secs = divmod(t, 60)
                 display_timer.markdown(f'<div class="timer-digital">{mins:02d}:{secs:02d}</div>', unsafe_allow_html=True)
                 time.sleep(1)
             st.success("Sessão Terminada!")
         else:
-            display_timer.markdown(f'<div class="timer-digital">{t_foco:02d}:00</div>', unsafe_allow_html=True)
+            display_timer.markdown(f'<div class="timer-digital">{t_foco_opt:02d}:00</div>', unsafe_allow_html=True)
 
     st.divider()
     st.subheader("📝 Registro Final")
-    topico = st.text_input("Tópico:")
-    c1, c2, c3, c4 = st.columns(4)
-    t_manual = c1.number_input("Minutos Totais", min_value=0, value=t_foco)
-    q_t = c2.number_input("Questões", 0)
-    q_a = c3.number_input("Acertos", 0)
-    pags = c4.number_input("Páginas", 0)
+    topico = st.text_input("Tópico Estudado:")
+    
+    # Campo de Tempo em formato de seleção (Slider de Seleção)
+    tempo_manual = st.select_slider("Tempo Total Gasto (Minutos):", options=[0, 15, 30, 45, 60, 75, 90, 105, 120, 150, 180, 240], value=t_foco_opt)
+    
+    c1, c2, c3 = st.columns(3)
+    q_t = c1.number_input("Questões Total", 0)
+    q_a = c2.number_input("Acertos", 0)
+    pags = c3.number_input("Páginas", 0)
 
     if st.button("💾 SALVAR ESTUDO"):
-        novo_p = pd.DataFrame([{"data": datetime.now().strftime("%d/%m/%Y"), "materia": materia, "giro": giro, "topico": topico, "tempo": t_manual, "acertos": q_a, "total_q": q_t, "paginas": pags}])
+        novo_p = pd.DataFrame([{"data": datetime.now().strftime("%d/%m/%Y"), "materia": materia, "giro": giro, "topico": topico, "tempo": tempo_manual, "acertos": q_a, "total_q": q_t, "paginas": pags}])
         salvar_dados("progresso", novo_p)
         st.rerun()
 
-# --- ABA 2: PERFORMANCE & HEATMAP ---
+# --- ABA 2: PERFORMANCE & HEATMAP (FORMATO GRID INVESTIDA) ---
 with tabs[1]:
     if not df_p.empty:
-        st.subheader("🔥 Consistência Diária")
+        st.subheader("⚡ Consistência (Heatmap)")
+        
+        # Lógica para o grid de 365 dias (estilo Investida)
         df_p['data_dt'] = pd.to_datetime(df_p['data'], format='%d/%m/%Y')
         df_daily = df_p.groupby('data_dt')['tempo'].sum().reset_index()
+        
         hoje = datetime.now()
-        inicio = hoje - timedelta(weeks=12)
-        datas_range = pd.date_range(start=inicio, end=hoje)
-        df_heat = pd.DataFrame({'data_dt': datas_range}).merge(df_daily, on='data_dt', how='left').fillna(0)
+        inicio_ano = datetime(hoje.year, 1, 1)
+        datas_ano = pd.date_range(start=inicio_ano, end=hoje + timedelta(days=30)) # Mostra um pouco do futuro
+        
+        df_heat = pd.DataFrame({'data_dt': datas_ano}).merge(df_daily, on='data_dt', how='left').fillna(0)
         df_heat['week'] = df_heat['data_dt'].dt.isocalendar().week
         df_heat['day'] = df_heat['data_dt'].dt.weekday
+
+        fig_heat = go.Figure(data=go.Heatmap(
+            z=df_heat['tempo'],
+            x=df_heat['week'],
+            y=df_heat['day'],
+            colorscale=[[0, '#21262D'], [0.1, '#0E4429'], [0.5, '#26A641'], [1, '#39D353']], # Cores estilo GitHub/Investida
+            showscale=False, xgap=3, ygap=3
+        ))
         
-        fig_heat = go.Figure(data=go.Heatmap(z=df_heat['tempo'], x=df_heat['data_dt'], y=df_heat['day'], colorscale='Viridis', showscale=False, xgap=2, ygap=2))
-        fig_heat.update_layout(height=180, margin=dict(t=0, b=0, l=0, r=0), yaxis=dict(tickvals=[0,2,4,6], ticktext=['Seg','Qua','Sex','Dom']))
+        fig_heat.update_layout(
+            height=180, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
+            margin=dict(t=10, b=10, l=10, r=10),
+            xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+            yaxis=dict(showgrid=False, zeroline=False, tickvals=[0,2,4,6], ticktext=['S','Q','Q','D'], autorange="reversed")
+        )
         st.plotly_chart(fig_heat, use_container_width=True)
 
         st.divider()
         df_agrupado = df_p.groupby('materia').agg({'acertos': 'sum', 'total_q': 'sum'}).reset_index()
         df_agrupado['%'] = (df_agrupado['acertos'] / df_agrupado['total_q'] * 100).fillna(0)
-        fig_bar = px.bar(df_agrupado, x='materia', y='%', text_auto='.1f', title="Rendimento por Disciplina (%)", template="plotly_dark")
+        fig_bar = px.bar(df_agrupado, x='materia', y='%', text_auto='.1f', title="Rendimento (%)", template="plotly_dark", color_discrete_sequence=['#39D353'])
         st.plotly_chart(fig_bar, use_container_width=True)
-    else:
-        st.info("Registe o seu estudo para gerar estatísticas.")
 
-# --- ABA 3: CADERNO DE ERROS (COM TIPO DE ERRO REINSERIDO) ---
+# --- ABA 3: CADERNO DE ERROS ---
 with tabs[2]:
-    st.header("📓 Caderno de Erros Estratégicos")
-    with st.expander("📝 Catalogar Novo Erro", expanded=True):
+    st.header("📓 Caderno de Erros")
+    with st.expander("📝 Catalogar Novo Erro"):
         e_mat = st.selectbox("Matéria:", materias_list, key="err_m")
-        e_link = st.text_input("Link da Questão (URL):")
-        e_tipo = st.selectbox("Causa do Erro:", ["Falta de Base/Teoria", "Falta de Atenção", "Esquecimento", "Interpretação/Pegadinha", "Assunto não Estudado"])
-        e_obs = st.text_area("O que aprendi com este erro?")
+        e_link = st.text_input("Link da Questão:")
+        e_tipo = st.selectbox("Causa do Erro:", ["Base Teórica", "Atenção", "Pegadinha", "Esquecimento"])
+        e_obs = st.text_area("O que aprendi?")
         if st.button("💾 SALVAR NO CADERNO"):
             salvar_dados("caderno_erros", pd.DataFrame([{"data": datetime.now().strftime("%d/%m/%Y"), "materia": e_mat, "link": e_link, "tipo_erro": e_tipo, "comentario": e_obs}]))
             st.rerun()
     
     if not df_erros.empty:
-        st.divider()
         for _, row in df_erros.iterrows():
             st.markdown(f"""<div class="card-erro"><b>{row['materia']}</b> | <span style="color:#E63946;">{row.get('tipo_erro', 'Erro')}</span><br><i>"{row['comentario']}"</i><br><a href="{row['link']}" target="_blank">🔗 Ver Questão</a></div>""", unsafe_allow_html=True)
 
@@ -126,6 +139,6 @@ with tabs[2]:
 with tabs[3]:
     novo_nome = st.text_input("Nome do Concurso:", value=concurso)
     novas_mats = st.text_area("Matérias (vírgula):", value=",".join(materias_list))
-    if st.button("💾 ATUALIZAR EDITAL"):
+    if st.button("💾 ATUALIZAR"):
         salvar_dados("config", pd.DataFrame([{"concurso": novo_nome, "materias": novas_mats}]))
         st.rerun()
