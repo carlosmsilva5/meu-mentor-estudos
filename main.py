@@ -14,7 +14,7 @@ st.markdown("""
     section[data-testid="stSidebar"] { background-color: #000000; }
     .card { background: #3a3b3c; padding: 18px; border-radius: 10px; margin-bottom: 12px; border: 1px solid #4f4f4f; text-align: center; }
     .title { font-size: 14px; color: #b0b3b8; font-weight: bold; text-transform: uppercase; }
-    .value { font-size: 28px; font-weight: bold; color: #3ec6a8; }
+    .value { font-size: 28px; font-weight: bold; color: #ffffff; }
     .ciclo-card { background: #3a3b3c; border: 1px solid #4f4f4f; padding: 15px; border-radius: 10px; text-align: center; border-top: 4px solid #3ec6a8; }
     .cronograma-table { width: 100%; border-collapse: collapse; background: #3a3b3c; border-radius: 8px; overflow: hidden; margin-top: 15px; }
     .cronograma-table td, .cronograma-table th { padding: 12px; border: 1px solid #4f4f4f; text-align: left; }
