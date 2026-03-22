@@ -11,7 +11,7 @@ st.set_page_config(layout="wide", page_title="Mentor Elite Pro", page_icon="🎯
 st.markdown("""
 <style>
     .stApp { background-color: #2f3136; color: #e4e6eb; }
-    section[data-testid="stSidebar"] { background: linear-gradient(180deg, #3ec6a8, #2bbf9b); }
+    section[data-testid="stSidebar"] { background-color: #202225; }
     .card { background: #3a3b3c; padding: 18px; border-radius: 10px; margin-bottom: 12px; border: 1px solid #4f4f4f; text-align: center; }
     .title { font-size: 14px; color: #b0b3b8; font-weight: bold; text-transform: uppercase; }
     .value { font-size: 28px; font-weight: bold; color: #3ec6a8; }
@@ -112,7 +112,7 @@ with st.sidebar:
 
 # ---------------- PÁGINAS ----------------
 if page == "Home":
-    st.title("Visão Geral do Concurseiro")
+    st.title("Visão Geral")
     
     t_min = pd.to_numeric(df_estudo['tempo'], errors='coerce').sum() if not df_estudo.empty else 0
     q_tot = pd.to_numeric(df_estudo['total_q'], errors='coerce').sum() if not df_estudo.empty else 0
