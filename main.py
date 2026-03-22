@@ -114,4 +114,14 @@ with col_right:
     st.markdown('<div class="section-title">ADICIONAR ESTUDO</div>', unsafe_allow_html=True)
     with st.expander("⏱️ Cronômetro e Registro", expanded=True):
         mat = st.selectbox("Disciplina", materias_list)
-        t_sel = st.select_slider("Minutos", options=[0, 15, 30,
+        t_sel = st.select_slider("Minutos", options=[0, 15, 30, 45, 60, 90, 120, 180], value=30)
+        
+        if st.button("💾 Salvar Registro"):
+            # Função de salvar...
+            st.success("Salvo!")
+            st.rerun()
+            
+    st.markdown('<div class="section-title">CADERNO DE ERROS</div>', unsafe_allow_html=True)
+    if st.button("➕ Novo Erro"):
+        # Navegação ou modal para erros
+        pass
