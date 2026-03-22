@@ -129,7 +129,11 @@ if page == "Home":
     st.divider()
 
     if not df_estudo.empty:
+        # Garantindo que os valores são números
         df_estudo['tempo_num'] = pd.to_numeric(df_estudo['tempo'], errors='coerce').fillna(0)
+        df_estudo['acertos_num'] = pd.to_numeric(df_estudo['acertos'], errors='coerce').fillna(0)
+        df_estudo['total_q_num'] = pd.to_numeric(df_estudo['total_q'], errors='coerce').fillna(0)
+        
         col_grafico1, col_grafico2 = st.columns(2)
         
         with col_grafico1:
