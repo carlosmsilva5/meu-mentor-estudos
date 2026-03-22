@@ -152,11 +152,11 @@ if page == "Home":
                 theta='materia', 
                 line_close=True,
                 markers=True,
-                color_discrete_sequence=['#3ec6a8']
+                color_discrete_sequence=['white']
             )
             fig_radar.update_traces(fill='toself')
             fig_radar.update_layout(
-                polar=dict(
+                polar=dict(bgcolor='rgba(0,0,0,0)'
                     radialaxis=dict(visible=True, range=[0, 100], color='white', gridcolor='#4f4f4f'),
                     angularaxis=dict(color='white', gridcolor='#4f4f4f')
                 ),
