@@ -244,11 +244,15 @@ elif page == "Ciclo de Estudos":
     
     dados_ciclo = []
     for m in materias_list:
-        with st.expander(f" {m}", expanded=False):
-            c1, c2 = st.columns(2)
+        with st.expander(f"Ajustar: {m}", expanded=False):
+            # Agora temos 3 colunas em vez de 2
+            c1, c2, c3 = st.columns(3)
             p = c1.select_slider("Peso no Edital", [1,2,3,4,5], 3, key=f"p_{m}")
             n = c2.select_slider("Seu Nível", [1,2,3,4,5], 3, key=f"n_{m}")
-            dados_ciclo.append({"materia": m, "fator": p/n, "peso": p, "nivel": n})
+            # Novo campo numérico para Giros por Ciclo
+            g = c3.number_input("Giros por Ciclo", min_value=1, max_value=14, value=1, step=1, key=f"g_{m}")
+            
+            dados_ciclo.append({"materia": m, "fator": p/n, "peso": p, "nivel": n, "giros": g})
 
     df_c = pd.DataFrame(dados_ciclo)
     df_c["horas"] = (df_c["fator"] / df_c["fator"].sum()) * horas_semana
@@ -257,10 +261,8 @@ elif page == "Ciclo de Estudos":
     cols = st.columns(3)
     for i, r in df_c.iterrows():
         with cols[i % 3]:
-            st.markdown(f'<div class="ciclo-card"><b style="color:white">{r["materia"]}</b><br><h3 style="color:#3ec6a8">{decimal_para_horas(r["horas"])}</h3><small style="color:gray">Peso {r["peso"]} | Nível {r["nivel"]}</small></div>', unsafe_allow_html=True)
-
-    st.subheader("🗓️ Seu Cronograma Atual")
-    st.markdown("*(Você pode alterar a ordem e as disciplinas na aba 'Gestão de Dados')*")
+            # Adicionado a exibição dos giros no Card
+            st.markdown(f'<div class="ciclo-card"><b style="color:white">{r["materia"]}</b><br><h3 style="color:#3ec6a8">{decimal_para_horas(r["horas"])}</h3><small style="color:gray">Peso {r["peso"]} | Nível {r["nivel"]} | {r["giros"]} Giro(s)</small></div>', unsafe_allow_html=True)
     
     # Renderizando a tabela dinâmica baseada na aba 'cronograma'
     html_table = '<table class="cronograma-table"><tr><th>Dia</th><th>Módulo 1</th><th>Módulo 2</th><th>Módulo 3</th></tr>'
