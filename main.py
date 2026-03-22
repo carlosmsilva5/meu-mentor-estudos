@@ -383,12 +383,28 @@ elif page == "Gestão de Dados":
             st.success(f"{nova} adicionada!")
             st.rerun()
             
-    with t3:
+   with t3:
+        st.markdown("### Editar Histórico de Sessões")
         if not df_estudo.empty:
             ed_est = st.data_editor(df_estudo, num_rows="dynamic", key="ed_est", use_container_width=True)
             if st.button("Salvar Histórico"):
                 overwrite_data("progresso", ed_est)
+                st.success("Histórico salvo!")
                 st.rerun()
+                
+            st.divider()
+            
+            # Nova seção: Zona de Perigo para zerar o histórico
+            with st.expander("⚠️ Zona de Perigo (Apagar Tudo)"):
+                st.warning("Tem certeza? Esta ação apagará **TODO** o seu histórico de estudos e zerará os gráficos. Esta ação não pode ser desfeita no aplicativo.")
+                if st.button("🚨 Sim, Quero Zerar Meu Histórico", type="primary"):
+                    # Cria um DataFrame vazio apenas com as colunas originais para não quebrar a planilha
+                    df_vazio = pd.DataFrame(columns=["data", "materia", "tipo_estudo", "tempo", "acertos", "total_q"])
+                    overwrite_data("progresso", df_vazio)
+                    st.success("Histórico completamente zerado! Recomeçando de forma limpa.")
+                    st.rerun()
+        else:
+            st.info("Seu histórico de estudos já está completamente vazio! Faça alguns pomodoros para começar a gerar dados. 🚀")
                 
     with t4:
         st.markdown("### Editar Caderno de Erros")
