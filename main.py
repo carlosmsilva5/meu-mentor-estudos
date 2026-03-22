@@ -175,7 +175,7 @@ elif page == "Caderno de Erros":
     st.title("❌ Caderno de Erros Estratégico")
     
     # Lista de motivos de erro de alta performance
-    tipos_erro = ["Atenção / Bobeira", "Teoria não vista", "Interpretação de Texto", "Pegadinha da Banca", "Jurisprudência / Súmula"]
+    tipos_erro = ["Atenção / Bobeira", "Teoria não vista", "Erro de Interpretação", "Pegadinha", "Jurisprudência da Banca"]
     
     with st.form("form_erro", clear_on_submit=True):
         m_e = st.selectbox("Matéria", materias_list)
@@ -216,20 +216,7 @@ elif page == "Caderno de Erros":
     else:
         st.info("Você ainda não registrou nenhum erro no caderno. Bom trabalho (ou vá fazer mais questões!) 😉")
     
-    # Exibe a tabela visualmente logo abaixo do formulário
-    if not df_erros.empty:
-        st.dataframe(
-            df_erros, 
-            use_container_width=True, 
-            hide_index=True,
-            column_config={
-                "link": st.column_config.LinkColumn("Link da Questão"),
-                "comentario": st.column_config.TextColumn("Insight / Aprendizado")
-            }
-        )
-    else:
-        st.info("Você ainda não registrou nenhum erro no caderno. Bom trabalho (ou vá fazer mais questões!) 😉")
-
+   
 elif page == "Ciclo de Estudos":
     st.title("🎯 Planejamento do Ciclo")
     
