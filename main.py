@@ -1,46 +1,33 @@
 import streamlit as st
+from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime
 
 # ---------------- CONFIG ----------------
-st.set_page_config(layout="wide")
+st.set_page_config(layout="wide", page_title="Mentor Elite Pro")
 
-# ---------------- CSS PRO LEVEL ----------------
+# ---------------- CSS PROFISSIONAL ----------------
 st.markdown("""
 <style>
-
-:root {
-    --bg: #0f172a;
-    --card: #1e293b;
-    --accent: #22c55e;
-    --text: #e2e8f0;
-    --muted: #94a3b8;
-}
-
-/* Fundo */
 .stApp {
-    background-color: var(--bg);
-    color: var(--text);
+    background-color: #0f172a;
+    color: #e2e8f0;
 }
 
-/* Sidebar */
 section[data-testid="stSidebar"] {
     background: linear-gradient(180deg, #34d399, #059669);
-    color: white;
 }
 
-/* Cards */
 .card {
-    background: var(--card);
-    padding: 20px;
+    background: #1e293b;
+    padding: 18px;
     border-radius: 12px;
     border: 1px solid #334155;
 }
 
-/* Títulos */
 .title {
-    font-size: 14px;
-    color: var(--muted);
+    font-size: 13px;
+    color: #94a3b8;
 }
 
 .value {
@@ -48,45 +35,57 @@ section[data-testid="stSidebar"] {
     font-weight: bold;
 }
 
-/* Tabela estilo */
-table {
-    border-collapse: collapse;
-}
-
-/* Botões */
 .stButton button {
-    background: var(--accent);
-    border-radius: 8px;
+    background: #22c55e;
     color: black;
+    border-radius: 8px;
     font-weight: bold;
 }
-
 </style>
 """, unsafe_allow_html=True)
 
+# ---------------- CONEXÃO ----------------
+conn = st.connection("gsheets", type=GSheetsConnection)
+
+@st.cache_data(ttl=30)
+def load(sheet):
+    try:
+        return conn.read(worksheet=sheet).dropna(how='all')
+    except:
+        return pd.DataFrame()
+
+def save(sheet, df_new):
+    df = load(sheet)
+    df = pd.concat([df, df_new], ignore_index=True)
+    conn.update(worksheet=sheet, data=df)
+    st.cache_data.clear()
+
+# ---------------- LOAD ----------------
+df_estudo = load("progresso")
+df_erros = load("caderno_erros")
+
 # ---------------- SIDEBAR ----------------
 with st.sidebar:
-    st.title("📘 Estudo PRO")
+    st.title("📘 Mentor Elite")
 
-    menu = st.radio("",
-        ["🏠 Home", "📚 Disciplinas", "📊 Estatísticas", "⚙️ Config"]
-    )
+    page = st.radio("Menu", [
+        "🏠 Dashboard",
+        "➕ Registrar Estudo",
+        "📓 Caderno de Erros"
+    ])
 
-# ---------------- MOCK DATA ----------------
-df = pd.DataFrame({
-    "Disciplina": ["Contabilidade", "Português", "RLM"],
-    "Tempo": [120, 90, 60],
-    "Acertos": [80, 70, 50],
-    "Erros": [20, 30, 50]
-})
+# ---------------- DASHBOARD ----------------
+if page == "🏠 Dashboard":
 
-# ---------------- HOME ----------------
-if menu == "🏠 Home":
+    st.title("Dashboard")
 
-    st.title("Home")
+    col1, col2, col3 = st.columns(3)
 
-    # ---------- CARDS ----------
-    c1, c2, c3, c4 = st.columns(4)
+    total_tempo = df_estudo["tempo"].sum() if not df_estudo.empty else 0
+    total_q = df_estudo["total_q"].sum() if not df_estudo.empty else 0
+    total_acertos = df_estudo["acertos"].sum() if not df_estudo.empty else 0
+
+    aproveitamento = (total_acertos / total_q * 100) if total_q > 0 else 0
 
     def card(col, title, value):
         with col:
@@ -97,51 +96,102 @@ if menu == "🏠 Home":
             </div>
             """, unsafe_allow_html=True)
 
-    card(c1, "Tempo de Estudo", "120h")
-    card(c2, "Desempenho", "78%")
-    card(c3, "Progresso", "35%")
-    card(c4, "Meta", "TRF4")
+    card(col1, "Tempo Total", f"{int(total_tempo//60)}h {int(total_tempo%60)}min")
+    card(col2, "Aproveitamento", f"{aproveitamento:.1f}%")
+    card(col3, "Erros Registrados", len(df_erros))
 
     st.write("")
 
-    # ---------- GRID PRINCIPAL ----------
-    left, right = st.columns([2,1])
+    st.subheader("📊 Disciplinas")
 
-    # --------- TABELA ----------
-    with left:
-        st.markdown("### 📊 Painel de Disciplinas")
+    if not df_estudo.empty:
+        df_group = df_estudo.groupby("materia").agg({
+            "tempo":"sum",
+            "acertos":"sum",
+            "total_q":"sum"
+        }).reset_index()
 
-        st.dataframe(df, use_container_width=True)
+        df_group["%"] = (df_group["acertos"]/df_group["total_q"]*100).fillna(0)
 
-    # --------- LATERAL ----------
-    with right:
-        st.markdown("### 🎯 Metas")
+        st.dataframe(df_group, use_container_width=True)
+    else:
+        st.info("Nenhum estudo registrado ainda.")
 
-        st.markdown("""
-        <div class="card">
-        📅 Prova em: <b>45 dias</b><br><br>
-        ⏱ Meta semanal: 30h<br>
-        🎯 Questões: 500
-        </div>
-        """, unsafe_allow_html=True)
+# ---------------- REGISTRAR ESTUDO ----------------
+elif page == "➕ Registrar Estudo":
 
-        st.write("")
+    st.title("Registrar Estudo")
 
-        st.markdown("""
-        <div class="card">
-        📈 Progresso semanal<br><br>
-        ███████░░ 70%
-        </div>
-        """, unsafe_allow_html=True)
+    with st.form("form_estudo"):
 
-# ---------------- DISCIPLINAS ----------------
-elif menu == "📚 Disciplinas":
-    st.title("Disciplinas")
+        materia = st.text_input("Matéria")
+        tempo = st.number_input("Tempo (min)", 0)
+        questoes = st.number_input("Questões", 0)
+        acertos = st.number_input("Acertos", 0)
 
-# ---------------- ESTATÍSTICAS ----------------
-elif menu == "📊 Estatísticas":
-    st.title("Estatísticas")
+        submitted = st.form_submit_button("Salvar")
 
-# ---------------- CONFIG ----------------
-else:
-    st.title("Configurações")
+        if submitted:
+
+            new = pd.DataFrame([{
+                "data": datetime.now().strftime("%d/%m/%Y"),
+                "materia": materia,
+                "tempo": tempo,
+                "acertos": acertos,
+                "total_q": questoes
+            }])
+
+            save("progresso", new)
+
+            st.success("Estudo registrado!")
+            st.rerun()
+
+# ---------------- CADERNO DE ERROS ----------------
+elif page == "📓 Caderno de Erros":
+
+    st.title("Caderno de Erros")
+
+    with st.form("form_erro"):
+
+        materia = st.text_input("Matéria")
+        tipo = st.selectbox("Tipo de erro", [
+            "Teoria",
+            "Atenção",
+            "Interpretação",
+            "Pegadinha"
+        ])
+        link = st.text_input("Link da questão")
+        comentario = st.text_area("O que você aprendeu com o erro?")
+
+        submitted = st.form_submit_button("Salvar erro")
+
+        if submitted:
+
+            new = pd.DataFrame([{
+                "data": datetime.now().strftime("%d/%m/%Y"),
+                "materia": materia,
+                "tipo": tipo,
+                "link": link,
+                "comentario": comentario
+            }])
+
+            save("caderno_erros", new)
+
+            st.success("Erro salvo!")
+            st.rerun()
+
+    st.divider()
+
+    if not df_erros.empty:
+
+        for _, row in df_erros.iterrows():
+            st.markdown(f"""
+            <div class="card">
+            <b>{row['materia']}</b> | {row['tipo']}<br>
+            {row['comentario']}<br>
+            <a href="{row['link']}" target="_blank">🔗 Ver questão</a>
+            </div>
+            """, unsafe_allow_html=True)
+
+    else:
+        st.info("Nenhum erro registrado ainda.")
