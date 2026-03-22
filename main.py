@@ -311,22 +311,7 @@ elif page == "Caderno de Erros":
 elif page == "🎯 Ciclo de Estudos":
     st.title("🎯 Cronograma da Semana")
     
-    if not df_cronograma.empty:
-        # Exibe a tabela exatamente como você editou na Gestão de Dados
-        st.markdown("""
-        <style>
-            .crono-view { width: 100%; border-collapse: collapse; background: #3a3b3c; border-radius: 8px; }
-            .crono-view td, .crono-view th { padding: 12px; border: 1px solid #4f4f4f; text-align: center; }
-            .crono-view th { background: #202225; color: #3ec6a8; }
-        </style>
-        """, unsafe_allow_html=True)
-        
-        # Converte o DataFrame em HTML para manter o estilo visual
-        st.write("### 🗓️ Sua Escala de Estudos")
-        st.dataframe(df_cronograma, use_container_width=True, hide_index=True)
-    else:
-        st.warning("Nenhum cronograma encontrado. Vá em 'Gestão de Dados' para criar sua escala.")
-    
+     
     giro = calcular_giro_atual(df_estudo)
     st.markdown(f'<div class="giro-badge">🔄 Você está no Giro {giro} do Ciclo Global</div>', unsafe_allow_html=True)
     st.markdown("Ajuste a carga horária baseada na sua dificuldade (Nível) e importância para o edital (Peso).")
