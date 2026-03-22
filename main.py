@@ -1,5 +1,4 @@
-
-            # Exibiçãoimport streamlit as st
+import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 import plotly.express as px
@@ -99,4 +98,4 @@ with tabs[3]:
         # Aqui usamos o update direto para não ficar criando linhas infinitas na aba config
         conn.update(worksheet="config", data=config_df)
         st.cache_data.clear()
-        st.success("Configurações atualizadas! Clique em Rerun no menu superior se não atualizar sozinho.") de diagnóstico...
+        st.success("Configurações atualizadas! Clique em Rerun no menu superior se não atualizar sozinho.")
