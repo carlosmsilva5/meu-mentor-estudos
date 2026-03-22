@@ -308,10 +308,9 @@ elif page == "Caderno de Erros":
         st.info("Você ainda não registrou nenhum erro no caderno. Bom trabalho (ou vá fazer mais questões!) 😉")
     
    
-elif page == "🎯 Ciclo de Estudos":
-    st.title("🎯 Cronograma da Semana")
+elif page == "Ciclo de Estudos":
+    st.title("🎯 Planejamento do Ciclo")
     
-     
     giro = calcular_giro_atual(df_estudo)
     st.markdown(f'<div class="giro-badge">🔄 Você está no Giro {giro} do Ciclo Global</div>', unsafe_allow_html=True)
     st.markdown("Ajuste a carga horária baseada na sua dificuldade (Nível) e importância para o edital (Peso).")
