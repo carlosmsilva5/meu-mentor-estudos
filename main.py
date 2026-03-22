@@ -101,7 +101,7 @@ materias_list = str(df_config["materias"].iloc[0]).split(",") if not df_config.e
 with st.sidebar:
     st.title("📘 Mentor Elite")
     menu_map = {
-        "🏠 Dashboard BI": "Home",
+        "🏠 Dashboard": "Home",
         "⏱️ Registrar Pomodoro": "Registrar Estudo",
         "❌ Caderno de Erros": "Caderno de Erros",
         "🎯 Ciclo de Estudos": "Ciclo de Estudos",
@@ -139,15 +139,20 @@ if page == "Home":
             fig_donut.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='white'))
             st.plotly_chart(fig_donut, use_container_width=True)
 
-        with col_grafico2:
+    with col_grafico2:
             st.subheader("Evolução (Últimos 7 Dias)")
             df_estudo['data_fmt'] = pd.to_datetime(df_estudo['data'], format='%d/%m/%Y', errors='coerce')
             evolucao = df_estudo.groupby('data_fmt')["tempo_num"].sum().reset_index().sort_values('data_fmt').tail(7)
             evolucao['data_str'] = evolucao['data_fmt'].dt.strftime('%d/%m')
             
-            fig_bar = px.bar(evolucao, x='data_str', y='tempo_num', text_auto=True, labels={'tempo_num': 'Minutos', 'data_str': 'Data'}, color_discrete_sequence=['#3ec6a8'])
-            fig_bar.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='white'))
-            st.plotly_chart(fig_bar, use_container_width=True)
+            # Mudança de px.bar para px.line, adicionando marcadores e os textos dos minutos
+            fig_line = px.line(evolucao, x='data_str', y='tempo_num', text='tempo_num', markers=True, labels={'tempo_num': 'Minutos', 'data_str': 'Data'}, color_discrete_sequence=['#3ec6a8'])
+            
+            # Ajusta a posição do número para ficar em cima da linha, não no meio dela
+            fig_line.update_traces(textposition="top center") 
+            fig_line.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='white'))
+            
+            st.plotly_chart(fig_line, use_container_width=True, config={'staticPlot': True})
 
 elif page == "Registrar Estudo":
     st.title("⏱️ Registro de Sessão")
