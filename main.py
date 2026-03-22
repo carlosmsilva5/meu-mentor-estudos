@@ -236,7 +236,7 @@ elif page == "Registrar Estudo":
         try:
             lista_disciplinas = conn.read(worksheet="materias")['materia'].unique().tolist()
         except:
-            lista_disciplinas = ["Nenhuma Disciplina Cadastrada"]
+            lista_disciplinas = [for m in materias_list:
 
     # 2. Campos de entrada (Fora do form para permitir cálculo em tempo real)
     col1, col2 = st.columns(2)
