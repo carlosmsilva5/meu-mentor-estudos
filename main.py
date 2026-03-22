@@ -156,7 +156,8 @@ if page == "Home":
             )
             fig_radar.update_traces(fill='toself')
             fig_radar.update_layout(
-                polar=dict(bgcolor=bgcolor='rgba(0,0,0,0)
+                polar=dict(
+                    bgcolor='rgba(0,0,0,0)', 
                     radialaxis=dict(visible=True, range=[0, 100], color='white', gridcolor='#4f4f4f'),
                     angularaxis=dict(color='white', gridcolor='#4f4f4f')
                 ),
