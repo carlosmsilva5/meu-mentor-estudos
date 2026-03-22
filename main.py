@@ -228,7 +228,7 @@ elif page == "Ciclo de Estudos":
     
     dados_ciclo = []
     for m in materias_list:
-        with st.expander(f": {m}", expanded=False):
+        with st.expander(f" {m}", expanded=False):
             c1, c2 = st.columns(2)
             p = c1.select_slider("Peso no Edital", [1,2,3,4,5], 3, key=f"p_{m}")
             n = c2.select_slider("Seu Nível", [1,2,3,4,5], 3, key=f"n_{m}")
