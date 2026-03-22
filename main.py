@@ -309,7 +309,7 @@ elif page == "Caderno de Erros":
     
    
 elif page == "Ciclo de Estudos":
-    st.title("🎯 Planejamento do Ciclo")
+    st.title("🎯 Cronograma da Semana")
     
     giro = calcular_giro_atual(df_estudo)
     st.markdown(f'<div class="giro-badge">🔄 Você está no Giro {giro} do Ciclo Global</div>', unsafe_allow_html=True)
