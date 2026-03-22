@@ -179,11 +179,33 @@ elif page == "Caderno de Erros":
         obs_e = st.text_area("Insight: O que você aprendeu com esse erro?")
         if st.form_submit_button("Registrar no Caderno"):
             novo_e = pd.DataFrame([{"data": datetime.now().strftime("%d/%m/%Y"), "materia": m_e, "tipo": "Atenção", "link": link_e, "comentario": obs_e}])
+            
             df_atual_e = conn.read(worksheet="caderno_erros").dropna(how='all')
+            # Garante que as colunas existam mesmo se a planilha for nova
+            if df_atual_e.empty:
+                df_atual_e = pd.DataFrame(columns=["data", "materia", "tipo", "link", "comentario"])
+                
             conn.update(worksheet="caderno_erros", data=pd.concat([df_atual_e, novo_e], ignore_index=True))
             st.cache_data.clear()
-            st.success("Erro catalogado!")
+            st.success("Erro catalogado com sucesso!")
             st.rerun()
+
+    st.divider()
+    st.subheader("📚 Seus Erros Registrados")
+    
+    # Exibe a tabela visualmente logo abaixo do formulário
+    if not df_erros.empty:
+        st.dataframe(
+            df_erros, 
+            use_container_width=True, 
+            hide_index=True,
+            column_config={
+                "link": st.column_config.LinkColumn("Link da Questão"),
+                "comentario": st.column_config.TextColumn("Insight / Aprendizado")
+            }
+        )
+    else:
+        st.info("Você ainda não registrou nenhum erro no caderno. Bom trabalho (ou vá fazer mais questões!) 😉")
 
 elif page == "Ciclo de Estudos":
     st.title("🎯 Planejamento do Ciclo")
