@@ -100,4 +100,61 @@ with tab_home:
     with c_left:
         st.markdown("**DESEMPENHO POR DISCIPLINA**")
         if not df_p.empty:
-            df_display = df_p.groupby('materia').agg({'tempo':'
+            df_display = df_p.groupby('materia').agg({'tempo':'sum', 'acertos':'sum', 'total_q':'sum'}).reset_index()
+            df_display['%'] = (df_display['acertos']/df_display['total_q']*100).fillna(0).map('{:.1f}%'.format)
+            st.dataframe(df_display, use_container_width=True, hide_index=True)
+        else:
+            st.info("Nenhum dado registrado.")
+
+    with c_right:
+        st.markdown("**SESSÃO DE ESTUDO**")
+        with st.container():
+            mat = st.selectbox("Disciplina", materias_list)
+            giro = st.number_input("Giro", 1)
+            
+            # Cronômetro Digital
+            t_foco = st.select_slider("Tempo Alvo (Min)", options=[15, 30, 45, 60, 90], value=30)
+            timer_place = st.empty()
+            timer_place.markdown(f'<div class="timer-digital">{t_foco:02d}:00</div>', unsafe_allow_html=True)
+            
+            col_btn1, col_btn2 = st.columns(2)
+            if col_btn1.button("▶️ START"):
+                for t in range(t_foco * 60, -1, -1):
+                    mins, secs = divmod(t, 60)
+                    timer_place.markdown(f'<div class="timer-digital">{mins:02d}:{secs:02d}</div>', unsafe_allow_html=True)
+                    time.sleep(1)
+                st.balloons()
+            
+            st.divider()
+            t_final = st.select_slider("Tempo Real Realizado", options=[0, 15, 30, 45, 60, 90, 120, 180], value=t_foco)
+            q_t = st.number_input("Questões", 0)
+            q_a = st.number_input("Acertos", 0)
+            
+            if st.button("💾 SALVAR ESTUDO"):
+                salvar_dados("progresso", pd.DataFrame([{"data": datetime.now().strftime("%d/%m/%Y"), "materia": mat, "giro": giro, "tempo": t_final, "acertos": q_a, "total_q": q_t, "paginas": 0}]))
+                st.rerun()
+
+# --- TAB CADERNO DE ERROS ---
+with tab_erros:
+    st.subheader("📓 Caderno de Erros")
+    with st.expander("➕ Adicionar Novo Erro"):
+        e_mat = st.selectbox("Matéria", materias_list, key="err_m")
+        e_link = st.text_input("Link da Questão")
+        e_tipo = st.selectbox("Causa", ["Base Teórica", "Atenção", "Pegadinha", "Esquecimento"])
+        e_obs = st.text_area("Insight")
+        if st.button("💾 SALVAR ERRO"):
+            salvar_dados("caderno_erros", pd.DataFrame([{"data": datetime.now().strftime("%d/%m/%Y"), "materia": e_mat, "link": e_link, "tipo_erro": e_tipo, "comentario": e_obs}]))
+            st.rerun()
+    
+    if not df_erros.empty:
+        for _, row in df_erros.iterrows():
+            st.markdown(f"""<div class="card-erro"><b>{row['materia']}</b> | <span style="color:#F85149">{row.get('tipo_erro','Erro')}</span><br>{row['comentario']}<br><a href="{row['link']}">🔗 Ver Questão</a></div>""", unsafe_allow_html=True)
+
+# --- TAB CONFIG ---
+with tab_config:
+    st.subheader("⚙️ Configurações")
+    n_conc = st.text_input("Concurso", value=concurso)
+    n_mats = st.text_area("Matérias (vírgula)", value=",".join(materias_list))
+    if st.button("💾 ATUALIZAR TUDO"):
+        salvar_dados("config", pd.DataFrame([{"concurso": n_conc, "materias": n_mats}]))
+        st.rerun()
