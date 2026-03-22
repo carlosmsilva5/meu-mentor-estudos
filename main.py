@@ -27,9 +27,13 @@ st.markdown("""
 
 # ---------------- FUNÇÕES ----------------
 def formatar_tempo(minutos):
-    if minutos < 60: return f"{int(minutos)}m"
+    if minutos < 60: return f"{int(minutos)}min"
     h, m = int(minutos // 60), int(minutos % 60)
-    return f"{h}h {m:02d}m"
+    return f"{h:02d}h {m:02d}min"
+
+def decimal_para_horas(horas_decimais):
+    total_minutos = horas_decimais * 60
+    return formatar_tempo(total_minutos)
 
 conn = st.connection("gsheets", type=GSheetsConnection)
 
@@ -141,7 +145,7 @@ elif page == "Caderno de Erros":
                 st.markdown(f'<div class="erro-item"><small>{r["data"]} | <b>{r["tipo"]}</b></small><br>{r["comentario"]}<br>{btn_html}</div>', unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
 
-# ---------------- CICLO DE ESTUDOS (COM INPUT MANUAL) ----------------
+# ---------------- CICLO DE ESTUDOS (CORREÇÃO DE FORMATO) ----------------
 elif page == "🎯 Ciclo de Estudos":
     st.title("Gerador de Ciclo Personalizado")
     
@@ -151,26 +155,18 @@ elif page == "🎯 Ciclo de Estudos":
         st.info("💡 **Como funciona:** O app calcula a prioridade. Quanto maior o **Peso** e menor a **Proficiência**, mais tempo a matéria terá no ciclo.")
 
     st.write("---")
-    
-    # Grid de Inputs
-    col_pesos = []
-    dados_ciclo = []
-    
     st.subheader("📊 Definição de Parâmetros")
     
-    # Criamos uma tabela de inputs para ficar organizado
+    dados_ciclo = []
     for m in materias_list:
         with st.expander(f"Configurar: {m}", expanded=True):
             c1, c2 = st.columns(2)
             p = c1.select_slider(f"Peso no Edital", options=[1, 2, 3, 4, 5], value=3, key=f"peso_{m}")
             n = c2.select_slider(f"Sua Proficiência (Nível)", options=[1, 2, 3, 4, 5], value=3, key=f"nivel_{m}", help="1: Iniciante | 5: Avançado")
             
-            # Cálculo do Fator de Prioridade: Peso / Nível
-            # Adicionamos uma pequena constante para não dividir por zero e equilibrar
             fator_prioridade = p / n
             dados_ciclo.append({"materia": m, "fator": fator_prioridade, "peso": p, "nivel": n})
 
-    # Cálculos Finais
     df_ciclo = pd.DataFrame(dados_ciclo)
     total_fator = df_ciclo["fator"].sum()
     df_ciclo["horas_sugeridas"] = (df_ciclo["fator"] / total_fator) * horas_semana
@@ -178,14 +174,16 @@ elif page == "🎯 Ciclo de Estudos":
     st.write("---")
     st.subheader("📅 Meta de Horas por Matéria")
     
-    # Exibição em colunas para facilitar a leitura
     grid_cols = st.columns(3)
     for idx, row in df_ciclo.iterrows():
+        # AQUI ESTÁ A CORREÇÃO: Transformamos o decimal em HHh MMmin
+        tempo_formatado_ciclo = decimal_para_horas(row['horas_sugeridas'])
+        
         with grid_cols[idx % 3]:
             st.markdown(f"""
             <div class="ciclo-card">
                 <div style="font-size:14px; color:#3ec6a8; font-weight:bold;">{row['materia']}</div>
-                <div style="font-size:28px; font-weight:bold; margin:10px 0;">{row['horas_sugeridas']:.1f}h</div>
+                <div style="font-size:24px; font-weight:bold; margin:10px 0;">{tempo_formatado_ciclo}</div>
                 <div style="font-size:11px; color:#b0b3b8;">
                     Peso: {row['peso']} | Nível: {row['nivel']}
                 </div>
