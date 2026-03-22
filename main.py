@@ -34,6 +34,20 @@ def formatar_tempo(minutos):
 def decimal_para_horas(horas_decimais):
     return formatar_tempo(horas_decimais * 60)
 
+def append_data(worksheet_name, data_dict):
+    """Função para adicionar uma nova linha na planilha Google"""
+    try:
+        # Tenta ler os dados existentes
+        df_existente = conn.read(worksheet=worksheet_name)
+        # Cria um DataFrame com a nova linha
+        df_novo = pd.DataFrame([data_dict])
+        # Junta o antigo com o novo
+        df_final = pd.concat([df_existente, df_novo], ignore_index=True)
+        # Atualiza a planilha inteira
+        conn.update(worksheet=worksheet_name, data=df_final)
+    except Exception as e:
+        st.error(f"Erro na função append_data: {e}")
+        
 def calcular_streak(df):
     if df.empty or 'data' not in df.columns: return 0
     df['data_fmt'] = pd.to_datetime(df['data'], format='%d/%m/%Y', errors='coerce')
