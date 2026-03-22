@@ -136,4 +136,3 @@ elif page == "📓 Caderno de Erros":
     if not df_erros.empty:
         for _, row in df_erros.iterrows():
             st.markdown(f'<div class="card"><b>{row["materia"]}</b> | {row["tipo"]}<br>{row["comentario"]}<br><a href="{row["link"]}">🔗 Link</a></div>', unsafe_allow_html=True)
-            
