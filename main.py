@@ -139,17 +139,28 @@ if page == "Home":
             fig_donut.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='white'))
             st.plotly_chart(fig_donut, use_container_width=True)
 
-    with col_grafico2:
+  with col_grafico2:
             st.subheader("Evolução (Últimos 7 Dias)")
             df_estudo['data_fmt'] = pd.to_datetime(df_estudo['data'], format='%d/%m/%Y', errors='coerce')
             evolucao = df_estudo.groupby('data_fmt')["tempo_num"].sum().reset_index().sort_values('data_fmt').tail(7)
             evolucao['data_str'] = evolucao['data_fmt'].dt.strftime('%d/%m')
             
-            # Mudança de px.bar para px.line, adicionando marcadores e os textos dos minutos
-            fig_line = px.line(evolucao, x='data_str', y='tempo_num', text='tempo_num', markers=True, labels={'tempo_num': 'Minutos', 'data_str': 'Data'}, color_discrete_sequence=['#3ec6a8'])
+            # Convertendo os minutos para horas (arredondando para 1 casa decimal)
+            evolucao['horas_estudo'] = (evolucao['tempo_num'] / 60).round(1)
             
-            # Ajusta a posição do número para ficar em cima da linha, não no meio dela
-            fig_line.update_traces(textposition="top center") 
+            # Criando o gráfico de linha com a escala em horas
+            fig_line = px.line(
+                evolucao, 
+                x='data_str', 
+                y='horas_estudo', 
+                text='horas_estudo', 
+                markers=True, 
+                labels={'horas_estudo': 'Horas', 'data_str': 'Data'}, 
+                color_discrete_sequence=['#3ec6a8']
+            )
+            
+            # Ajustando a posição e adicionando um "h" na frente do número (ex: 2.5h)
+            fig_line.update_traces(textposition="top center", texttemplate='%{text}h') 
             fig_line.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='white'))
             
             st.plotly_chart(fig_line, use_container_width=True, config={'staticPlot': True})
