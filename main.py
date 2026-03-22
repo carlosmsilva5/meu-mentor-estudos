@@ -227,50 +227,46 @@ if page == "Home":
 elif page == "Registrar Estudo":
     st.title("📝 Registrar Nova Sessão")
     
-    # 1. Tenta garantir que df_materias esteja disponível
-    # Se o seu script carrega as matérias no início como 'df_materias', use-a aqui:
-    if 'df_materias' not in locals() and 'df_materias' not in globals():
-        # Caso a variável global falhe, tentamos ler novamente
+    # 1. Busca as disciplinas cadastradas (Garantindo que olha para a variável global)
+    # No seu app, as disciplinas estão no df_materias carregado no início
+    if 'df_materias' in globals() and not df_materias.empty:
+        lista_disciplinas = df_materias['materia'].unique().tolist()
+    else:
+        # Tenta ler novamente da conexão caso a variável global não esteja acessível neste escopo
         try:
-            df_materias = conn.read(worksheet="materias")
+            lista_disciplinas = conn.read(worksheet="materias")['materia'].unique().tolist()
         except:
-            df_materias = pd.DataFrame(columns=["materia"])
+            lista_disciplinas = ["Nenhuma Disciplina Cadastrada"]
 
-    # 2. Início do Formulário
-    with st.form("form_registro_v3", clear_on_submit=True):
-        col1, col2 = st.columns(2)
-        with col1:
-            data_estudo = st.date_input("Data", pd.Timestamp.today())
-            
-            # BUSCA REAL: Pega a coluna 'materia' do seu DataFrame de matérias cadastradas
-            if not df_materias.empty and 'materia' in df_materias.columns:
-                lista_materias = df_materias['materia'].unique().tolist()
-            else:
-                lista_materias = ["Nenhuma Matéria Cadastrada"]
-                
-            materia_selecionada = st.selectbox("Selecione a Matéria", lista_materias)
-        
-        with col2:
-            tipo_estudo = st.radio("Tipo de Estudo", ["Teoria", "Questões", "Revisão"], horizontal=True)
-            humor = st.select_slider("Foco / Humor", options=["Exausto", "Cansado", "Neutro", "Focado"], value="Neutro")
+    # 2. Campos de entrada (Fora do form para permitir cálculo em tempo real)
+    col1, col2 = st.columns(2)
+    with col1:
+        data_estudo = st.date_input("Data", pd.Timestamp.today())
+        disciplina_selecionada = st.selectbox("Disciplina", lista_disciplinas)
+    
+    with col2:
+        tipo_estudo = st.radio("Tipo de Estudo", ["Teoria", "Questões", "Revisão"], horizontal=True)
+        humor = st.select_slider("Foco / Humor", options=["Exausto", "Cansado", "Neutro", "Focado"], value="Neutro")
 
-        st.divider()
-        
-        # --- SEÇÃO DE PÁGINAS (Cálculo Automático) ---
-        st.subheader("📖 Progresso na Leitura")
-        c_p1, c_p2, c_p3 = st.columns(3)
-        with c_p1:
-            p_ini = st.number_input("Página Inicial", min_value=0, value=0)
-        with c_p2:
-            p_fim = st.number_input("Página Final", min_value=0, value=0)
-        with c_p3:
-            # Cálculo visual apenas para conferência
-            total_p_lidas = p_fim - p_ini if p_fim >= p_ini else 0
-            st.metric("Total Páginas", total_p_lidas)
+    st.divider()
+    
+    # SEÇÃO DE PÁGINAS COM CÁLCULO AUTOMÁTICO
+    st.subheader("📖 Progresso na Leitura")
+    c_p1, c_p2, c_p3 = st.columns(3)
+    with c_p1:
+        p_ini = st.number_input("Página Inicial", min_value=0, value=0, key="p_ini")
+    with c_p2:
+        p_fim = st.number_input("Página Final", min_value=0, value=0, key="p_fim")
+    
+    # O cálculo agora acontece instantaneamente na tela
+    total_p_lidas = p_fim - p_ini if p_fim >= p_ini else 0
+    with c_p3:
+        st.metric("Total de Páginas", total_p_lidas)
 
-        st.divider()
+    st.divider()
 
-        # --- TEMPO E QUESTÕES ---
+    # 3. FORMULÁRIO FINAL PARA SALVAMENTO
+    with st.form("form_final_registro", clear_on_submit=True):
         col_t, col_q1, col_q2 = st.columns(3)
         with col_t:
             tempo_input = st.number_input("Minutos Estudados", min_value=0, step=5)
@@ -281,34 +277,31 @@ elif page == "Registrar Estudo":
 
         obs = st.text_area("Notas da sessão (opcional)")
         
-        # Botão de envio OBRIGATÓRIO dentro do form
-        btn_salvar = st.form_submit_button("Gravar Sessão no Histórico", use_container_width=True)
+        btn_salvar = st.form_submit_button("Confirmar e Gravar no Histórico", use_container_width=True)
         
-    # 3. Lógica após o clique (fora do form)
     if btn_salvar:
-        if materia_selecionada == "Nenhuma Matéria Cadastrada":
-            st.warning("⚠️ Você precisa cadastrar matérias primeiro na aba 'Gestão de Dados'.")
+        if disciplina_selecionada == "Nenhuma Disciplina Cadastrada":
+            st.error("⚠️ Erro: Nenhuma disciplina encontrada. Cadastre-as na aba Gestão de Dados.")
         else:
-            calc_paginas = p_fim - p_ini if p_fim >= p_ini else 0
-            
+            # Monta o dicionário com os dados capturados
             nova_sessao = {
                 "data": data_estudo.strftime('%d/%m/%Y'),
-                "materia": materia_selecionada,
+                "materia": disciplina_selecionada,
                 "tipo_estudo": tipo_estudo,
                 "tempo": int(tempo_input),
                 "acertos": int(t_acer),
                 "total_q": int(t_quest),
-                "paginas": int(calc_paginas),
+                "paginas": int(total_p_lidas), # Usa o cálculo feito acima
                 "humor": humor,
                 "obs": obs
             }
             
             try:
                 append_data("progresso", nova_sessao)
-                st.success(f"✅ Salvo com sucesso! {materia_selecionada}: {tempo_input}min e {calc_paginas} páginas.")
+                st.success(f"✅ Sucesso! {total_p_lidas} páginas de {disciplina_selecionada} registradas.")
                 st.balloons()
             except Exception as e:
-                st.error(f"Erro ao salvar: {e}")
+                st.error(f"Erro técnico ao salvar: {e}")
 
 elif page == "Caderno de Erros":
     st.title("❌ Caderno de Erros Estratégico")
