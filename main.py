@@ -227,16 +227,28 @@ if page == "Home":
 elif page == "Registrar Estudo":
     st.title("📝 Registrar Nova Sessão")
     
-    # 1. Busca as disciplinas cadastradas (Garantindo que olha para a variável global)
-    # No seu app, as disciplinas estão no df_materias carregado no início
-    if 'df_materias' in globals() and not df_materias.empty:
-        lista_disciplinas = df_materias['materia'].unique().tolist()
-    else:
-        # Tenta ler novamente da conexão caso a variável global não esteja acessível neste escopo
-        try:
-            lista_disciplinas = conn.read(worksheet="materias")['materia'].unique().tolist()
-        except:
-            lista_disciplinas = [Portugues, Matematica e Raciocino Logico, Informatica, Regimento Interno, Dir Constitucional, Dir Administrativo, Contabilidade Geral, Contabilidade Publica, Administracao Financeira Orcamentaria, Auditoria, Estudo de Caso]
+  # 1. BUSCA AS DISCIPLINAS (Tenta a planilha, se falhar usa a sua lista fixa)
+    try:
+        df_materias_atu = conn.read(worksheet="materias")
+        lista_disciplinas = df_materias_atu['materia'].dropna().unique().tolist()
+    except:
+        # Lista fixa corrigida com aspas para evitar o SyntaxError
+        lista_disciplinas = [
+            "Português", 
+            "Matemática e Raciocínio Lógico", 
+            "Informática", 
+            "Regimento Interno", 
+            "Dir. Constitucional", 
+            "Dir. Administrativo", 
+            "Contabilidade Geral", 
+            "Contabilidade Pública", 
+            "Administração Financeira Orçamentária", 
+            "Auditoria", 
+            "Estudo de Caso"
+        ]
+
+    if not lista_disciplinas:
+        lista_disciplinas = ["Nenhuma Disciplina Cadastrada"]
 
     # 2. Campos de entrada (Fora do form para permitir cálculo em tempo real)
     col1, col2 = st.columns(2)
