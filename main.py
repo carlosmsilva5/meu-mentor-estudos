@@ -1,12 +1,13 @@
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
+import plotly.graph_objects as go
 
 # ---------------- CONFIG ----------------
 st.set_page_config(layout="wide")
 
-# ---------------- CSS NIVEL ESTUDEI ----------------
+# ---------------- CSS PREMIUM ----------------
 st.markdown("""
 <style>
 
@@ -18,11 +19,6 @@ st.markdown("""
 /* SIDEBAR */
 section[data-testid="stSidebar"] {
     background: linear-gradient(180deg, #3ec6a8, #2bbf9b);
-    padding-top: 20px;
-}
-
-section[data-testid="stSidebar"] * {
-    color: white !important;
 }
 
 /* CARDS */
@@ -33,6 +29,7 @@ section[data-testid="stSidebar"] * {
     margin-bottom: 10px;
 }
 
+/* TITULO */
 .title {
     font-size: 12px;
     color: #b0b3b8;
@@ -43,15 +40,7 @@ section[data-testid="stSidebar"] * {
     font-weight: bold;
 }
 
-/* BOTÃO */
-.stButton button {
-    background: #3ec6a8;
-    color: black;
-    border-radius: 8px;
-    font-weight: bold;
-}
-
-/* ERROS */
+/* ERRO */
 .erro {
     background: #3a3b3c;
     border-left: 4px solid #ff6b6b;
@@ -87,23 +76,54 @@ df_erros = load("caderno_erros")
 with st.sidebar:
     st.title("📘 Estudo")
 
-    page = st.radio("",
-        ["Home", "Adicionar Estudo", "Caderno de Erros"]
-    )
+    page = st.radio("", ["Home", "Adicionar Estudo", "Erros"])
+
+# ---------------- FUNÇÕES ----------------
+def calcular_metricas():
+    total_tempo = df["tempo"].sum() if not df.empty else 0
+    total_q = df["total_q"].sum() if not df.empty else 0
+    total_acertos = df["acertos"].sum() if not df.empty else 0
+
+    aproveitamento = (total_acertos / total_q * 100) if total_q > 0 else 0
+
+    return total_tempo, aproveitamento, len(df_erros)
+
+def heatmap():
+    hoje = datetime.now()
+    inicio = datetime(hoje.year, 1, 1)
+
+    dias = pd.date_range(inicio, inicio + timedelta(days=364))
+    base = pd.DataFrame({'data': dias})
+
+    if not df.empty:
+        df["data_dt"] = pd.to_datetime(df["data"], format="%d/%m/%Y")
+        daily = df.groupby("data_dt")["tempo"].sum().reset_index()
+        base = base.merge(daily, left_on="data", right_on="data_dt", how="left").fillna(0)
+    else:
+        base["tempo"] = 0
+
+    base["week"] = base["data"].dt.isocalendar().week
+    base["day"] = base["data"].dt.weekday
+
+    fig = go.Figure(go.Heatmap(
+        z=base["tempo"],
+        x=base["week"],
+        y=base["day"],
+        colorscale=[[0,'#2f3136'],[0.5,'#26a641'],[1,'#39d353']],
+        showscale=False
+    ))
+
+    fig.update_layout(height=150, margin=dict(t=0,b=0,l=0,r=0))
+    st.plotly_chart(fig, use_container_width=True)
 
 # ---------------- HOME ----------------
 if page == "Home":
 
     st.title("Home")
 
-    # -------- CARDS --------
+    t, ap, erros = calcular_metricas()
+
     c1, c2, c3 = st.columns(3)
-
-    total_tempo = df["tempo"].sum() if not df.empty else 0
-    total_q = df["total_q"].sum() if not df.empty else 0
-    total_acertos = df["acertos"].sum() if not df.empty else 0
-
-    aproveitamento = (total_acertos / total_q * 100) if total_q > 0 else 0
 
     def card(col, title, value):
         with col:
@@ -114,50 +134,75 @@ if page == "Home":
             </div>
             """, unsafe_allow_html=True)
 
-    card(c1, "Tempo de estudo", f"{int(total_tempo//60)}h")
-    card(c2, "Desempenho", f"{aproveitamento:.1f}%")
-    card(c3, "Erros", len(df_erros))
+    card(c1, "Tempo de Estudo", f"{int(t//60)}h")
+    card(c2, "Desempenho", f"{ap:.1f}%")
+    card(c3, "Erros", erros)
 
-    st.write("")
+    st.markdown("### Constância nos estudos")
+    heatmap()
 
-    # -------- TABELA DISCIPLINAS --------
-    st.subheader("Painel")
+    col_left, col_right = st.columns([2,1])
 
-    if not df.empty:
-        tabela = df.groupby("materia").agg({
-            "tempo":"sum",
-            "acertos":"sum",
-            "total_q":"sum"
-        }).reset_index()
+    # -------- TABELA --------
+    with col_left:
+        st.subheader("Painel de Disciplinas")
 
-        tabela["%"] = (tabela["acertos"]/tabela["total_q"]*100).fillna(0)
+        if not df.empty:
+            tabela = df.groupby("materia").agg({
+                "tempo":"sum",
+                "acertos":"sum",
+                "total_q":"sum"
+            }).reset_index()
 
-        st.dataframe(tabela, use_container_width=True)
-    else:
-        st.info("Sem dados ainda.")
+            tabela["%"] = (tabela["acertos"]/tabela["total_q"]*100).fillna(0)
 
-# ---------------- ADICIONAR ESTUDO ----------------
+            st.dataframe(tabela, use_container_width=True)
+        else:
+            st.info("Sem dados.")
+
+    # -------- METAS --------
+    with col_right:
+        st.subheader("Metas semanais")
+
+        meta_horas = st.number_input("Meta horas/semana", 0, 100, 20)
+        meta_q = st.number_input("Meta questões/semana", 0, 1000, 200)
+
+        semana = datetime.now().isocalendar()[1]
+
+        if not df.empty:
+            df["week"] = pd.to_datetime(df["data"], format="%d/%m/%Y").dt.isocalendar().week
+            atual = df[df["week"] == semana]
+
+            horas = atual["tempo"].sum()
+            questoes = atual["total_q"].sum()
+        else:
+            horas = 0
+            questoes = 0
+
+        st.write(f"📚 Horas: {horas}/{meta_horas}")
+        st.write(f"📝 Questões: {questoes}/{meta_q}")
+
+# ---------------- ADICIONAR ----------------
 elif page == "Adicionar Estudo":
 
-    st.title("Adicionar Estudo")
+    st.title("Registrar Estudo")
 
     with st.form("form"):
 
         materia = st.text_input("Matéria")
         tempo = st.number_input("Tempo (min)", 0)
-        questoes = st.number_input("Questões", 0)
-        acertos = st.number_input("Acertos", 0)
+        q = st.number_input("Questões", 0)
+        a = st.number_input("Acertos", 0)
 
         submit = st.form_submit_button("Salvar")
 
         if submit:
-
             novo = pd.DataFrame([{
                 "data": datetime.now().strftime("%d/%m/%Y"),
                 "materia": materia,
                 "tempo": tempo,
-                "acertos": acertos,
-                "total_q": questoes
+                "acertos": a,
+                "total_q": q
             }])
 
             save("progresso", novo)
@@ -165,11 +210,11 @@ elif page == "Adicionar Estudo":
             st.rerun()
 
 # ---------------- ERROS ----------------
-elif page == "Caderno de Erros":
+elif page == "Erros":
 
     st.title("Caderno de Erros")
 
-    with st.form("erro_form"):
+    with st.form("erro"):
 
         materia = st.text_input("Matéria")
 
@@ -180,13 +225,12 @@ elif page == "Caderno de Erros":
             "Pegadinha"
         ])
 
-        link = st.text_input("Link da questão")
-        comentario = st.text_area("O que aprendeu?")
+        link = st.text_input("Link")
+        comentario = st.text_area("Comentário")
 
-        submit = st.form_submit_button("Salvar erro")
+        submit = st.form_submit_button("Salvar")
 
         if submit:
-
             novo = pd.DataFrame([{
                 "data": datetime.now().strftime("%d/%m/%Y"),
                 "materia": materia,
@@ -206,6 +250,6 @@ elif page == "Caderno de Erros":
         <div class="erro">
         <b>{r['materia']}</b> | {r['tipo']}<br>
         {r['comentario']}<br>
-        <a href="{r['link']}" target="_blank">🔗 Abrir questão</a>
+        <a href="{r['link']}" target="_blank">🔗 Questão</a>
         </div>
         """, unsafe_allow_html=True)
