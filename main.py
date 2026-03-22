@@ -225,26 +225,69 @@ if page == "Home":
             st.plotly_chart(fig_line, use_container_width=True, config={'staticPlot': True})
 
 elif page == "Registrar Estudo":
-    st.title("⏱️ Registro de Sessão")
+    st.title("📝 Registrar Nova Sessão")
+    
     with st.form("form_registro", clear_on_submit=True):
-        materia = st.selectbox("Matéria Focada", materias_list)
-        tempo = st.number_input("Tempo Líquido (minutos)", value=0, step=5)
-        st.caption("Atalhos rápidos: 🍅 25min | 🍅🍅 50min | 🧠 90min")
-        st.divider()
-        cq1, cq2 = st.columns(2)
-        q_t = cq1.number_input("Total de Questões Feitas", 0)
-        q_a = cq2.number_input("Total de Acertos", 0)
+        col1, col2 = st.columns(2)
+        with col1:
+            data_estudo = st.date_input("Data", pd.Timestamp.today())
+            materia_selecionada = st.selectbox("Matéria", df_materias['materia'].tolist() if not df_materias.empty else ["Nenhuma"])
         
-        if st.form_submit_button("Salvar Sessão de Estudo", use_container_width=True):
-            if tempo == 0 and q_t == 0:
-                st.error("Insira o tempo estudado ou a quantidade de questões!")
-            else:
-                novo = pd.DataFrame([{"data": datetime.now().strftime("%d/%m/%Y"), "materia": materia, "tipo_estudo": "Pomodoro", "tempo": tempo, "acertos": q_a, "total_q": q_t}])
-                df_atual = conn.read(worksheet="progresso").dropna(how='all')
-                conn.update(worksheet="progresso", data=pd.concat([df_atual, novo], ignore_index=True))
-                st.cache_data.clear()
-                st.success("Sessão registrada com sucesso! 🔥")
-                st.rerun()
+        with col2:
+            tipo_estudo = st.radio("Tipo de Estudo", ["Teoria", "Questões", "Revisão"], horizontal=True)
+            humor = st.select_slider("Como foi seu foco/humor hoje?", options=["Exausto", "Cansado", "Neutro", "Focado"])
+
+        st.divider()
+        
+        # --- SEÇÃO DE TEMPO COM CRONÔMETRO ---
+        st.subheader("⏱️ Tempo de Estudo")
+        col_t1, col_t2 = st.columns([1, 2])
+        with col_t1:
+            tempo_input = st.number_input("Minutos Estudados", min_value=0, value=0, step=5)
+        with col_t2:
+            st.info("Dica: Use o cronômetro do seu celular ou computador e insira o tempo final aqui.")
+
+        st.divider()
+
+        # --- SEÇÃO DE PÁGINAS E QUESTÕES ---
+        col_p1, col_p2, col_q1, col_q2 = st.columns(4)
+        
+        with col_p1:
+            p_inicial = st.number_input("Pág. Inicial", min_value=0, value=0)
+        with col_p2:
+            p_final = st.number_input("Pág. Final", min_value=0, value=0)
+            # Cálculo automático das páginas
+            total_paginas = p_final - p_inicial if p_final >= p_inicial else 0
+            
+        with col_q1:
+            total_q = st.number_input("Total Questões", min_value=0, value=0)
+        with col_q2:
+            acertos = st.number_input("Acertos", min_value=0, value=0)
+
+        # Resumo automático para o usuário
+        if total_paginas > 0:
+            st.write(f"📖 **Total de páginas lidas:** {total_paginas}")
+
+        observacoes = st.text_area("Notas sobre a sessão (opcional)")
+        
+        submit = st.form_submit_button("Gravar Sessão de Estudo", use_container_width=True)
+        
+        if submit:
+            nova_sessao = {
+                "data": data_estudo.strftime('%d/%m/%Y'),
+                "materia": materia_selecionada,
+                "tipo_estudo": tipo_estudo,
+                "tempo": tempo_input,
+                "acertos": acertos,
+                "total_q": total_q,
+                "paginas": total_paginas, # Nova coluna
+                "humor": humor,           # Nova coluna
+                "obs": observacoes
+            }
+            # Envia para o Sheets (certifique-se de que sua função append_data aceite essas novas colunas)
+            append_data("progresso", nova_sessao)
+            st.success(f"Excelente! {total_paginas} páginas e {tempo_input}min de {materia_selecionada} registrados.")
+            st.balloons()
 
 elif page == "Caderno de Erros":
     st.title("❌ Caderno de Erros Estratégico")
