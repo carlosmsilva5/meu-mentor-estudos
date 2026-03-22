@@ -25,6 +25,12 @@ st.markdown("""
     .link-btn { background: #3ec6a8; color: #000 !important; padding: 4px 10px; border-radius: 5px; text-decoration: none; font-weight: bold; font-size: 11px; display: inline-block; margin-top: 5px; }
     
     .ciclo-card { background: #3a3b3c; border: 1px solid #4f4f4f; padding: 15px; border-radius: 10px; text-align: center; border-top: 4px solid #3ec6a8; }
+    
+    /* CSS NOVO PARA A TABELA DE ORDEM SUGERIDA */
+    .cronograma-table { width: 100%; border-collapse: collapse; background: #3a3b3c; border-radius: 8px; overflow: hidden; margin-top: 15px; }
+    .cronograma-table td, .cronograma-table th { padding: 12px; border: 1px solid #4f4f4f; text-align: left; }
+    .cronograma-table th { background: #202225; color: #3ec6a8; }
+    .dia-num { background: #4e1d3d; color: white; font-weight: bold; text-align: center !important; width: 45px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -66,10 +72,18 @@ df_config = load_data("config")
 
 materias_list = str(df_config["materias"].iloc[0]).split(",") if not df_config.empty else ["Português"]
 
-# ---------------- SIDEBAR ----------------
+# ---------------- SIDEBAR (ACRESCENTADO ÍCONES) ----------------
 with st.sidebar:
     st.title("📘 Mentor Elite")
-    page = st.radio("", ["Home", "Registrar Estudo", "Caderno de Erros", "🎯 Ciclo de Estudos", "⚙️ Gestão de Dados"])
+    menu_map = {
+        "🏠 Home": "Home",
+        "🧮 Registrar Estudo": "Registrar Estudo",
+        "❌ Caderno de Erros": "Caderno de Erros",
+        "🎯 Ciclo de Estudos": "Ciclo de Estudos",
+        "⚙️ Gestão de Dados": "Gestão de Dados"
+    }
+    selection = st.radio("", list(menu_map.keys()))
+    page = menu_map[selection]
 
 # ---------------- HOME ----------------
 if page == "Home":
@@ -154,7 +168,7 @@ elif page == "Caderno de Erros":
                 st.markdown(f'<div class="erro-item"><small>{r["data"]} | <b>{r["tipo"]}</b></small><br>{r["comentario"]}<br>{btn_html}</div>', unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
 
-# ---------------- CICLO DE ESTUDOS ----------------
+# ---------------- CICLO DE ESTUDOS (ACRESCENTADO SUGESTÃO DE ORDEM) ----------------
 elif page == "🎯 Ciclo de Estudos":
     st.title("Gerador de Ciclo Personalizado")
     horas_semana = st.number_input("Horas Totais na Semana", 5, 100, 20)
@@ -178,12 +192,29 @@ elif page == "🎯 Ciclo de Estudos":
         with grid_cols[idx % 3]:
             st.markdown(f'<div class="ciclo-card"><div style="font-size:14px; color:#3ec6a8; font-weight:bold;">{row["materia"]}</div><div style="font-size:24px; font-weight:bold; margin:10px 0;">{tempo_fmt}</div><div style="font-size:11px; color:#b0b3b8;">Peso: {row["peso"]} | Nível: {row["nivel"]}</div></div>', unsafe_allow_html=True)
 
-# ---------------- GESTÃO DE DATOS (ATUALIZADO) ----------------
+    st.write("---")
+    st.subheader("🗓️ Sugestão de Ordem Semanal")
+    # Lógica de Giro baseada nas matérias cadastradas
+    df_ordem = df_ciclo.sort_values(by="horas_sugeridas", ascending=False).reset_index()
+    def g_m(i): return df_ordem.iloc[i % len(df_ordem)]['materia'] if not df_ordem.empty else "-"
+
+    st.markdown(f"""
+    <table class="cronograma-table">
+        <tr><th>Dia</th><th>Materia Principal</th><th>Complemento/Giro</th></tr>
+        <tr><td class="dia-num">1</td><td>{g_m(0)}</td><td>{g_m(len(df_ordem)-1)}</td></tr>
+        <tr><td class="dia-num">2</td><td>{g_m(1)}</td><td>{g_m(len(df_ordem)-2)}</td></tr>
+        <tr><td class="dia-num">3</td><td>{g_m(2)}</td><td>{g_m(len(df_ordem)-3)}</td></tr>
+        <tr><td class="dia-num">4</td><td>{g_m(0)} (Revisão)</td><td>{g_m(3)}</td></tr>
+        <tr><td class="dia-num">5</td><td>{g_m(1)} (Revisão)</td><td>{g_m(4)}</td></tr>
+        <tr><td class="dia-num">6</td><td>Língua Portuguesa</td><td>Discursiva / Caso</td></tr>
+        <tr><td class="dia-num">7</td><td>{g_m(0)}</td><td>Simulado / Revisão</td></tr>
+    </table>
+    """, unsafe_allow_html=True)
+
+# ---------------- GESTÃO DE DATOS (MANTIDO) ----------------
 elif page == "⚙️ Gestão de Dados":
     st.title("Gerenciar Planilha")
-    
     tab1, tab2, tab3 = st.tabs(["📚 Disciplinas", "📝 Histórico de Estudo", "❌ Caderno de Erros"])
-    
     with tab1:
         st.subheader("Adicionar Nova Disciplina")
         nova_mat = st.text_input("Nome da Matéria")
@@ -193,25 +224,15 @@ elif page == "⚙️ Gestão de Dados":
                 overwrite_data("config", pd.DataFrame([{"materias": nova_lista}]))
                 st.success(f"'{nova_mat}' adicionada!")
                 st.rerun()
-
     with tab2:
         st.subheader("Editar Histórico de Estudo")
         if not df_estudo.empty:
             df_editado = st.data_editor(df_estudo, num_rows="dynamic", use_container_width=True, key="editor_estudo")
             if st.button("Salvar Alterações no Histórico"):
-                overwrite_data("progresso", df_editado)
-                st.success("Histórico atualizado!")
-                st.rerun()
-        else:
-            st.info("Nenhum registro de estudo encontrado.")
-
+                overwrite_data("progresso", df_editado); st.success("Histórico atualizado!"); st.rerun()
     with tab3:
         st.subheader("Editar Caderno de Erros")
         if not df_erros.empty:
             df_erros_editado = st.data_editor(df_erros, num_rows="dynamic", use_container_width=True, key="editor_erros")
             if st.button("Salvar Alterações nos Erros"):
-                overwrite_data("caderno_erros", df_erros_editado)
-                st.success("Caderno de erros atualizado!")
-                st.rerun()
-        else:
-            st.info("Nenhum erro registrado para editar.")
+                overwrite_data("caderno_erros", df_erros_editado); st.success("Erros atualizados!"); st.rerun()
