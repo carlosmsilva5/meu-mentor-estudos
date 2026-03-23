@@ -1,4 +1,3 @@
-
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
@@ -404,74 +403,121 @@ elif page == "Caderno de Erros":
     
    
 elif page == "Ciclo de Estudos":
-    st.title("🎯 Cronograma da Semana")
+    st.title("🎯 Planejamento do Ciclo")
     
-    giro = calcular_giro_atual(df_estudo)
-    st.markdown(f'<div class="giro-badge">🔄 Você está no Giro {giro} do Ciclo Global</div>', unsafe_allow_html=True)
-    st.markdown("Ajuste a carga horária baseada na sua dificuldade (Nível) e importância para o edital (Peso).")
+    # 1. Badge de Giro Global e Inputs de Topo
+    giro_global = calcular_giro_atual(df_estudo)
+    st.markdown(f'<div class="giro-badge">🔄 Você está no Giro {giro_global} do Ciclo Global</div>', unsafe_allow_html=True)
     
-    horas_semana = st.number_input("Horas pretendidas no ciclo:", 5, 100, 25)
+    col_topo1, col_topo2 = st.columns([1, 1.5])
     
+    with col_topo1:
+        horas_semana = st.number_input("Horas totais no ciclo:", 5, 100, 25)
+        st.caption("Ajuste os Pesos (importância) e Níveis (sua base) para equilibrar o ciclo.")
+
+    # 2. Captura de Dados Otimizada (Cards em Colunas em vez de Expanders)
     dados_ciclo = []
-    for m in materias_list:
-        with st.expander(f"Ajustar: {m}", expanded=False):
-            c1, c2, c3 = st.columns(3)
-            p = c1.select_slider("Peso no Edital", [1,2,3,4,5], 3, key=f"p_{m}")
-            n = c2.select_slider("Seu Nível", [1,2,3,4,5], 3, key=f"n_{m}")
-            # A meta de giros aqui serve apenas para o cálculo inicial da sugestão
-            g = c3.number_input("Meta de Giros", min_value=1, max_value=14, value=1, step=1, key=f"g_{m}")
-            dados_ciclo.append({"materia": m, "fator": p/n, "peso": p, "nivel": n, "giros": g})
-
-    df_c = pd.DataFrame(dados_ciclo)
-    df_c["horas"] = (df_c["fator"] / df_c["fator"].sum()) * horas_semana
+    st.write("---")
+    cols_ajuste = st.columns(3)
     
-    st.subheader("Distribuição da Carga Horária")
-    cols = st.columns(3)
-    for i, r in df_c.iterrows():
-        with cols[i % 3]:
-            st.markdown(f'<div class="ciclo-card"><b style="color:white">{r["materia"]}</b><br><h3 style="color:#3ec6a8">{decimal_para_horas(r["horas"])}</h3><small style="color:gray">Peso {r["peso"]} | Nível {r["nivel"]} | Meta: {r["giros"]} Giro(s)</small></div>', unsafe_allow_html=True)
-
-    st.divider()
-    st.subheader("🗓️ Ordem do Ciclo (Sugestão Editável)")
-    st.markdown("Abaixo está a sugestão intercalando as matérias. **Dê um clique duplo na tabela para editar a Disciplina, o número do Giro ou o Tempo!**")
-    
-    # Gerando a ordem sugerida dinamicamente baseada nos giros
-    blocos = []
-    ordem_idx = 1
-    max_giros = int(df_c["giros"].max()) if not df_c.empty else 1
-    
-    for giro_num in range(1, max_giros + 1):
-        df_g = df_c[df_c["giros"] >= giro_num].sort_values("horas", ascending=False)
-        for _, r in df_g.iterrows():
-            tempo_bloco = r["horas"] / r["giros"]
-            blocos.append({
-                "Ordem": ordem_idx,
-                "Disciplina": r["materia"],
-                "Giro": giro_num, # <--- COLUNA DO GIRO AQUI
-                "Tempo": decimal_para_horas(tempo_bloco)
-            })
-            ordem_idx += 1
+    for i, m in enumerate(materias_list):
+        with cols_ajuste[i % 3]:
+            st.markdown(f'<div style="background:#3a3b3c; padding:8px; border-radius:10px; border-top:4px solid #3ec6a8; text-align:center; margin-bottom:5px;"><b style="color:#3ec6a8; font-size:13px;">{m}</b></div>', unsafe_allow_html=True)
+            p = st.select_slider("Peso", [1,2,3,4,5], 3, key=f"p_{m}")
+            n = st.select_slider("Nível", [1,2,3,4,5], 3, key=f"n_{m}")
+            g = st.number_input("Meta Giros", 1, 14, 1, key=f"g_{m}")
             
-    df_sugestao = pd.DataFrame(blocos)
-    
-    # Tabela com campos editáveis (para alterar o giro diretamente)
-    ed_crono = st.data_editor(
-        df_sugestao,
-        use_container_width=True,
-        hide_index=True,
-        column_config={
-            "Ordem": st.column_config.NumberColumn("Fila", disabled=True),
-            "Disciplina": st.column_config.SelectboxColumn("Disciplina", options=materias_list),
-            "Giro": st.column_config.NumberColumn("Nº do Giro", min_value=1, max_value=20), # <--- CAMPO EDITÁVEL
-            "Tempo": st.column_config.TextColumn("Tempo do Bloco")
-        },
-        key="ed_ordem_ciclo"
-    )
-    
-    if st.button("Salvar Meu Ciclo", type="primary"):
-        overwrite_data("cronograma", ed_crono)
-        st.success("Ordem do ciclo salva com sucesso! Você pode acompanhá-la na aba de Gestão de Dados.")
-        st.rerun()
+            fator = p/n
+            dados_ciclo.append({"materia": m, "fator": fator, "peso": p, "nivel": n, "giros": g})
+
+    # 3. Processamento e Gráfico de Pizza Pastel
+    df_c = pd.DataFrame(dados_ciclo)
+    if not df_c.empty:
+        df_c["horas"] = (df_c["fator"] / df_c["fator"].sum()) * horas_semana
+        
+        with col_topo2:
+            # Lista expandida de cores pastel
+            base_cores = ['#FFB7B2', '#FFDAC1', '#E2F0CB', '#B5EAD7', '#C7CEEA', '#F3D1F4', '#F9FFB2', '#B2E2F2', '#D1F2B2', '#F2B2B2']
+            
+            # Garante que a lista de cores seja grande o suficiente repetindo a base
+            cores_expandidas = (base_cores * (len(df_c) // len(base_cores) + 1))[:len(df_c)]
+            
+            fig_p = px.pie(
+                df_c, 
+                values='horas', 
+                names='materia', 
+                hole=0.4, 
+                color_discrete_sequence=cores_expandidas
+            )
+            
+            fig_p.update_traces(
+                textinfo='label+percent', 
+                textposition='inside',
+                marker=dict(line=dict(color='#202225', width=2))
+            )
+            
+            fig_p.update_layout(
+                showlegend=False, 
+                margin=dict(l=0, r=0, t=0, b=0), 
+                paper_bgcolor='rgba(0,0,0,0)', 
+                font=dict(size=12, color="white")
+            )
+            st.plotly_chart(fig_p, use_container_width=True, config={'staticPlot': True})
+
+        # 4. Exibição dos Cards de Carga Horária
+        st.subheader("Distribuição da Carga Horária")
+        cols_res = st.columns(4)
+        for i, r in df_c.iterrows():
+            with cols_res[i % 4]:
+                st.markdown(f"""
+                    <div style="background:#2b2d2e; padding:10px; border-radius:8px; border-left:5px solid #3ec6a8; margin-bottom:10px;">
+                        <div style="font-size:11px; color:#b0b3b8;">{r['materia']}</div>
+                        <div style="font-size:18px; font-weight:bold; color:#ffffff;">{decimal_para_horas(r['horas'])}</div>
+                        <div style="font-size:10px; color:gray;">P{r['peso']} | N{r['nivel']} | G{r['giros']}</div>
+                    </div>
+                """, unsafe_allow_html=True)
+
+        st.divider()
+        st.subheader("🗓️ Ordem do Ciclo (Editável)")
+        st.markdown("Dê um clique duplo para editar a **Disciplina, o Nº do Giro ou o Tempo** antes de salvar!")
+
+        # 5. Gerando a ordem sugerida dinamicamente
+        blocos = []
+        ordem_idx = 1
+        max_giros = int(df_c["giros"].max())
+        
+        for giro_num in range(1, max_giros + 1):
+            df_g = df_c[df_c["giros"] >= giro_num].sort_values("horas", ascending=False)
+            for _, r in df_g.iterrows():
+                tempo_bloco = r["horas"] / r["giros"]
+                blocos.append({
+                    "Ordem": ordem_idx,
+                    "Disciplina": r["materia"],
+                    "Giro": giro_num,
+                    "Tempo": decimal_para_horas(tempo_bloco)
+                })
+                ordem_idx += 1
+        
+        df_sugestao = pd.DataFrame(blocos)
+        
+        # 6. Tabela Editável e Botão Salvar
+        ed_crono = st.data_editor(
+            df_sugestao,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "Ordem": st.column_config.NumberColumn("Fila", disabled=True),
+                "Disciplina": st.column_config.SelectboxColumn("Disciplina", options=materias_list),
+                "Giro": st.column_config.NumberColumn("Nº do Giro", min_value=1, max_value=20),
+                "Tempo": st.column_config.TextColumn("Tempo do Bloco")
+            },
+            key="ed_ordem_ciclo"
+        )
+        
+        if st.button("Salvar Meu Ciclo", type="primary"):
+            overwrite_data("cronograma", ed_crono)
+            st.success("Ciclo salvo com sucesso!")
+            st.rerun()
 
 elif page == "Gestão de Dados":
     st.title("⚙️ Painel de Controle")
