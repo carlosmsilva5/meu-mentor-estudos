@@ -437,10 +437,32 @@ elif page == "Ciclo de Estudos":
         df_c["horas"] = (df_c["fator"] / df_c["fator"].sum()) * horas_semana
         
         with col_topo2:
-            cores_pastel = ['#FFB7B2', '#FFDAC1', '#E2F0CB', '#B5EAD7', '#C7CEEA', '#F3D1F4']
-            fig_p = px.pie(df_c, values='horas', names='materia', hole=0.4, color_discrete_sequence=cores_pastel)
-            fig_p.update_traces(textinfo='label+percent', textposition='inside')
-            fig_p.update_layout(showlegend=False, margin=dict(l=0, r=0, t=0, b=0), paper_bgcolor='rgba(0,0,0,0)', font=dict(color="white"))
+            # Lista expandida de cores pastel
+            base_cores = ['#FFB7B2', '#FFDAC1', '#E2F0CB', '#B5EAD7', '#C7CEEA', '#F3D1F4', '#F9FFB2', '#B2E2F2', '#D1F2B2', '#F2B2B2']
+            
+            # Garante que a lista de cores seja grande o suficiente repetindo a base
+            cores_expandidas = (base_cores * (len(df_c) // len(base_cores) + 1))[:len(df_c)]
+            
+            fig_p = px.pie(
+                df_c, 
+                values='horas', 
+                names='materia', 
+                hole=0.4, 
+                color_discrete_sequence=cores_expandidas
+            )
+            
+            fig_p.update_traces(
+                textinfo='label+percent', 
+                textposition='inside',
+                marker=dict(line=dict(color='#202225', width=2))
+            )
+            
+            fig_p.update_layout(
+                showlegend=False, 
+                margin=dict(l=0, r=0, t=0, b=0), 
+                paper_bgcolor='rgba(0,0,0,0)', 
+                font=dict(size=12, color="white")
+            )
             st.plotly_chart(fig_p, use_container_width=True, config={'staticPlot': True})
 
         # 4. Exibição dos Cards de Carga Horária
