@@ -416,76 +416,70 @@ elif page == "Ciclo de Estudos":
         horas_semana = st.number_input("Horas totais no ciclo:", 5, 100, 25)
         st.caption("Ajuste os Pesos (importância) e Níveis (sua base) para equilibrar o ciclo.")
 
-    # 2. Captura de Dados Otimizada (Cards em Colunas em vez de Expanders)
+    # --- NOVO: Pré-cálculo necessário para o gráfico e para integrar nos cards ---
+    # Precisamos calcular a soma dos fatores antes de desenhar os cards para saber a hora individual
+    fatores_pre = []
+    for m in materias_list:
+        # Pega o valor atual da session state (ou padroniza como 3 se não existir)
+        p_v = st.session_state.get(f"p_{m}", 3)
+        n_v = st.session_state.get(f"n_{m}", 3)
+        fatores_pre.append(p_v / n_v)
+    soma_fatores_total = sum(fatores_pre) if fatores_pre else 1
+
+    # 2. Captura de Dados Integrada com Resultado (Substituindo o loop antigo)
     dados_ciclo = []
     st.write("---")
+    st.subheader("📚 Ajuste e Distribuição por Disciplina") # Título atualizado
     cols_ajuste = st.columns(3)
     
     for i, m in enumerate(materias_list):
         with cols_ajuste[i % 3]:
+            # Container visual do card
             st.markdown(f'<div style="background:#3a3b3c; padding:8px; border-radius:10px; border-top:4px solid #3ec6a8; text-align:center; margin-bottom:5px;"><b style="color:#3ec6a8; font-size:13px;">{m}</b></div>', unsafe_allow_html=True)
+            
+            # Controles de Ajuste
             p = st.select_slider("Peso", [1,2,3,4,5], 3, key=f"p_{m}")
             n = st.select_slider("Nível", [1,2,3,4,5], 3, key=f"n_{m}")
             g = st.number_input("Meta Giros", 1, 14, 1, key=f"g_{m}")
             
-            fator = p/n
-            dados_ciclo.append({"materia": m, "fator": fator, "peso": p, "nivel": n, "giros": g})
+            # Cálculo individual baseado na pré-soma
+            fator_m = p / n
+            horas_m = (fator_m / soma_fatores_total) * horas_semana
+            
+            dados_ciclo.append({"materia": m, "fator": fator_m, "peso": p, "nivel": n, "giros": g, "horas": horas_m})
+            
+            # --- NOVO: Exibição do Resultado INTEGRADA dentro do card ---
+            st.markdown(f"""
+                <div style="background:#2b2d2e; padding:10px; border-radius:8px; border-left:5px solid #3ec6a8; margin-top:5px; margin-bottom:15px; text-align:center;">
+                    <div style="font-size:11px; color:#b0b3b8;">Tempo Sugerido:</div>
+                    <div style="font-size:20px; font-weight:bold; color:#ffffff;">{decimal_para_horas(horas_m)}</div>
+                </div>
+            """, unsafe_allow_html=True)
 
-    # 3. Processamento e Gráfico de Pizza Pastel
+    # 3. Processamento e Gráfico de Pizza Pastel (Inalterado)
     df_c = pd.DataFrame(dados_ciclo)
     if not df_c.empty:
-        df_c["horas"] = (df_c["fator"] / df_c["fator"].sum()) * horas_semana
+        # Nota: df_c["horas"] já foi calculado dentro do loop acima, não precisamos recalcular
         
         with col_topo2:
-            # Lista expandida de cores pastel
             base_cores = ['#FFB7B2', '#FFDAC1', '#E2F0CB', '#B5EAD7', '#C7CEEA', '#F3D1F4', '#F9FFB2', '#B2E2F2', '#D1F2B2', '#F2B2B2']
-            
-            # Garante que a lista de cores seja grande o suficiente repetindo a base
             cores_expandidas = (base_cores * (len(df_c) // len(base_cores) + 1))[:len(df_c)]
             
-            fig_p = px.pie(
-                df_c, 
-                values='horas', 
-                names='materia', 
-                hole=0.4, 
-                color_discrete_sequence=cores_expandidas
-            )
-            
-            fig_p.update_traces(
-                textinfo='label+percent', 
-                textposition='inside',
-                marker=dict(line=dict(color='#202225', width=2))
-            )
-            
-            fig_p.update_layout(
-                showlegend=False, 
-                margin=dict(l=0, r=0, t=0, b=0), 
-                paper_bgcolor='rgba(0,0,0,0)', 
-                font=dict(size=12, color="white")
-            )
+            fig_p = px.pie(df_c, values='horas', names='materia', hole=0.4, color_discrete_sequence=cores_expandidas)
+            fig_p.update_traces(textinfo='label+percent', textposition='inside', marker=dict(line=dict(color='#202225', width=2)))
+            fig_p.update_layout(showlegend=False, margin=dict(l=0, r=0, t=0, b=0), paper_bgcolor='rgba(0,0,0,0)', font=dict(size=12, color="white"))
             st.plotly_chart(fig_p, use_container_width=True, config={'staticPlot': True})
 
-        # 4. Exibição dos Cards de Carga Horária
-        st.subheader("Distribuição da Carga Horária")
-        cols_res = st.columns(4)
-        for i, r in df_c.iterrows():
-            with cols_res[i % 4]:
-                st.markdown(f"""
-                    <div style="background:#2b2d2e; padding:10px; border-radius:8px; border-left:5px solid #3ec6a8; margin-bottom:10px;">
-                        <div style="font-size:11px; color:#b0b3b8;">{r['materia']}</div>
-                        <div style="font-size:18px; font-weight:bold; color:#ffffff;">{decimal_para_horas(r['horas'])}</div>
-                        <div style="font-size:10px; color:gray;">P{r['peso']} | N{r['nivel']} | G{r['giros']}</div>
-                    </div>
-                """, unsafe_allow_html=True)
+        # --- SEÇÃO 4 ANTIGA REMOVIDA (foi integrada no item 2) ---
 
         st.divider()
         st.subheader("🗓️ Ordem do Ciclo (Editável)")
         st.markdown("Dê um clique duplo para editar a **Disciplina, o Nº do Giro ou o Tempo** antes de salvar!")
 
-        # 5. Gerando a ordem sugerida dinamicamente
+        # 5. Gerando a ordem sugerida dinamicamente (Inalterado)
         blocos = []
         ordem_idx = 1
-        max_giros = int(df_c["giros"].max())
+        max_giros = int(df_c["giros"].max()) if not df_c.empty else 1
         
         for giro_num in range(1, max_giros + 1):
             df_g = df_c[df_c["giros"] >= giro_num].sort_values("horas", ascending=False)
@@ -501,7 +495,7 @@ elif page == "Ciclo de Estudos":
         
         df_sugestao = pd.DataFrame(blocos)
         
-        # 6. Tabela Editável e Botão Salvar
+        # 6. Tabela Editável e Botão Salvar (Inalterado)
         ed_crono = st.data_editor(
             df_sugestao,
             use_container_width=True,
