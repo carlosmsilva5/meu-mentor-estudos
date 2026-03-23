@@ -357,79 +357,121 @@ elif page == "Registrar Estudo":
             st.success(f"Estudo salvo! {total_paginas} páginas contabilizadas.")
             st.rerun()
 
-elif page == "Ciclo de Estudos":
-    st.title("🎯 Planejamento do Ciclo")
+elif page == "Caderno de Erros":
+    st.title("❌ Caderno de Erros Estratégico")
     
-    # --- 1. CARREGAMENTO REFORÇADO DA LISTA ---
-    try:
-        # Tenta ler a aba 'materias'
-        df_materias_atu = conn.read(worksheet="materias")
-        if not df_materias_atu.empty:
-            lista_ciclo_final = df_materias_atu['materia'].dropna().unique().tolist()
-        else:
-            lista_ciclo_final = ["Português", "Direito Constitucional", "Direito Administrativo"]
-    except:
-        # Caso o Sheets falhe, ele não trava o app
-        lista_ciclo_final = ["Português", "Direito Constitucional", "Direito Administrativo"]
-
-    # --- 2. CONFIGURAÇÃO DE CARGA SEMANAL ---
-    st.markdown('<div class="giro-badge">🕒 Carga Horária Semanal Total</div>', unsafe_allow_html=True)
-    horas_semana = st.number_input("Horas pretendidas na semana:", 5, 100, 20)
+    # Lista de motivos de erro de alta performance
+    tipos_erro = ["Atenção / Bobeira", "Teoria não vista", "Erro de Interpretação", "Pegadinha", "Jurisprudência da Banca"]
     
-    st.divider()
-
-    # --- 3. CÁLCULO PRÉVIO (Para o tempo aparecer dentro do card) ---
-    # Criamos um dicionário temporário para capturar os pesos antes de desenhar
-    controles = {}
-    
-    st.subheader("Configuração das Disciplinas")
-    cols = st.columns(3)
-
-    for i, materia in enumerate(lista_ciclo_final):
-        with cols[i % 3]:
-            # CARD INTEGRADO (Tudo aqui dentro)
-            st.markdown(f"""
-                <div style="background: #3a3b3c; border: 1px solid #4f4f4f; padding: 15px; border-radius: 10px 10px 0 0; text-align: center; border-top: 4px solid #3ec6a8;">
-                    <b style="color:white; font-size: 16px;">{materia}</b>
-                </div>
-            """, unsafe_allow_html=True)
+    with st.form("form_erro", clear_on_submit=True):
+        m_e = st.selectbox("Matéria", materias_list)
+        tipo_e = st.selectbox("Motivo do Erro", tipos_erro) # NOVO CAMPO DE SELEÇÃO
+        link_e = st.text_input("Link ou Referência da Questão")
+        obs_e = st.text_area("Insight: O que você aprendeu com esse erro?")
+        
+        if st.form_submit_button("Registrar no Caderno"):
+            # Agora a variável 'tipo' recebe a sua escolha (tipo_e) em vez de ser fixa
+            novo_e = pd.DataFrame([{"data": datetime.now().strftime("%d/%m/%Y"), "materia": m_e, "tipo": tipo_e, "link": link_e, "comentario": obs_e}])
             
-            # Inputs de Peso e Nível (agora dentro do contexto do card)
-            with st.container():
-                p = st.number_input("Peso", 1, 5, 3, key=f"p_c_{materia}")
-                n = st.number_input("Nível", 1, 5, 3, key=f"n_c_{materia}")
-                g = st.number_input("Giros", 1, 10, 1, key=f"g_c_{materia}")
+            df_atual_e = conn.read(worksheet="caderno_erros").dropna(how='all')
+            # Garante que as colunas existam
+            if df_atual_e.empty:
+                df_atual_e = pd.DataFrame(columns=["data", "materia", "tipo", "link", "comentario"])
                 
-                # Armazena para o cálculo que faremos abaixo
-                controles[materia] = {"fator": p/n, "peso": p, "nivel": n, "giros": g}
-            st.markdown("<br>", unsafe_allow_html=True)
+            conn.update(worksheet="caderno_erros", data=pd.concat([df_atual_e, novo_e], ignore_index=True))
+            st.cache_data.clear()
+            st.success(f"Erro de '{tipo_e}' catalogado com sucesso!")
+            st.rerun()
 
-    # --- 4. CÁLCULO DAS METAS ---
-    df_calc = pd.DataFrame.from_dict(controles, orient='index').reset_index()
-    df_calc.columns = ['materia', 'fator', 'peso', 'nivel', 'giros']
-    soma_f = df_calc["fator"].sum()
-    df_calc["horas_meta"] = (df_calc["fator"] / soma_f) * horas_semana if soma_f > 0 else 0
-
-    # --- 5. EXIBIÇÃO DO RESULTADO DENTRO DO CARD (RESUMO) ---
     st.divider()
-    st.subheader("Resumo da Carga Horária")
-    res_cols = st.columns(3)
+    st.subheader("📚 Seus Erros Registrados")
+    
+    if not df_erros.empty:
+        st.dataframe(
+            df_erros, 
+            use_container_width=True, 
+            hide_index=True,
+            column_config={
+                "data": "Data",
+                "materia": "Matéria",
+                "tipo": st.column_config.TextColumn("Motivo"), # Mostrando o motivo na tabela
+                "link": st.column_config.LinkColumn("Link da Questão"),
+                "comentario": st.column_config.TextColumn("Insight / Aprendizado")
+            }
+        )
+    else:
+        st.info("Você ainda não registrou nenhum erro no caderno. Bom trabalho (ou vá fazer mais questões!) 😉")
+    
+   
+elif page == "Ciclo de Estudos":
+    st.title("🎯 Cronograma da Semana")
+    
+    giro = calcular_giro_atual(df_estudo)
+    st.markdown(f'<div class="giro-badge">🔄 Você está no Giro {giro} do Ciclo Global</div>', unsafe_allow_html=True)
+    st.markdown("Ajuste a carga horária baseada na sua dificuldade (Nível) e importância para o edital (Peso).")
+    
+    horas_semana = st.number_input("Horas pretendidas no ciclo:", 5, 100, 25)
+    
+    dados_ciclo = []
+    for m in materias_list:
+        with st.expander(f"Ajustar: {m}", expanded=False):
+            c1, c2, c3 = st.columns(3)
+            p = c1.select_slider("Peso no Edital", [1,2,3,4,5], 3, key=f"p_{m}")
+            n = c2.select_slider("Seu Nível", [1,2,3,4,5], 3, key=f"n_{m}")
+            # A meta de giros aqui serve apenas para o cálculo inicial da sugestão
+            g = c3.number_input("Meta de Giros", min_value=1, max_value=14, value=1, step=1, key=f"g_{m}")
+            dados_ciclo.append({"materia": m, "fator": p/n, "peso": p, "nivel": n, "giros": g})
 
-    for idx, row in df_calc.iterrows():
-        tempo_str = decimal_para_horas(row["horas_meta"])
-        with res_cols[idx % 3]:
-            # Card Final com o Tempo em destaque
-            st.markdown(f"""
-                <div style="background: #202225; border: 1px solid #3ec6a8; padding: 15px; border-radius: 10px; text-align: center; margin-bottom: 20px;">
-                    <span style="color:white; font-size: 14px; opacity: 0.8;">{row['materia']}</span><br>
-                    <span style="color:#3ec6a8; font-size: 24px; font-weight: bold;">{tempo_str}</span><br>
-                    <small style="color:gray;">Meta Semanal Calculada</small>
-                </div>
-            """, unsafe_allow_html=True)
+    df_c = pd.DataFrame(dados_ciclo)
+    df_c["horas"] = (df_c["fator"] / df_c["fator"].sum()) * horas_semana
+    
+    st.subheader("Distribuição da Carga Horária")
+    cols = st.columns(3)
+    for i, r in df_c.iterrows():
+        with cols[i % 3]:
+            st.markdown(f'<div class="ciclo-card"><b style="color:white">{r["materia"]}</b><br><h3 style="color:#3ec6a8">{decimal_para_horas(r["horas"])}</h3><small style="color:gray">Peso {r["peso"]} | Nível {r["nivel"]} | Meta: {r["giros"]} Giro(s)</small></div>', unsafe_allow_html=True)
 
-    if st.button("💾 Salvar Planejamento do Ciclo", type="primary", use_container_width=True):
-        st.success("Configurações salvas! Os tempos foram atualizados com base no seu Peso/Nível.")
-                                     
+    st.divider()
+    st.subheader("🗓️ Ordem do Ciclo (Sugestão Editável)")
+    st.markdown("Abaixo está a sugestão intercalando as matérias. **Dê um clique duplo na tabela para editar a Disciplina, o número do Giro ou o Tempo!**")
+    
+    # Gerando a ordem sugerida dinamicamente baseada nos giros
+    blocos = []
+    ordem_idx = 1
+    max_giros = int(df_c["giros"].max()) if not df_c.empty else 1
+    
+    for giro_num in range(1, max_giros + 1):
+        df_g = df_c[df_c["giros"] >= giro_num].sort_values("horas", ascending=False)
+        for _, r in df_g.iterrows():
+            tempo_bloco = r["horas"] / r["giros"]
+            blocos.append({
+                "Ordem": ordem_idx,
+                "Disciplina": r["materia"],
+                "Giro": giro_num, # <--- COLUNA DO GIRO AQUI
+                "Tempo": decimal_para_horas(tempo_bloco)
+            })
+            ordem_idx += 1
+            
+    df_sugestao = pd.DataFrame(blocos)
+    
+    # Tabela com campos editáveis (para alterar o giro diretamente)
+    ed_crono = st.data_editor(
+        df_sugestao,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Ordem": st.column_config.NumberColumn("Fila", disabled=True),
+            "Disciplina": st.column_config.SelectboxColumn("Disciplina", options=materias_list),
+            "Giro": st.column_config.NumberColumn("Nº do Giro", min_value=1, max_value=20), # <--- CAMPO EDITÁVEL
+            "Tempo": st.column_config.TextColumn("Tempo do Bloco")
+        },
+        key="ed_ordem_ciclo"
+    )
+    
+    if st.button("Salvar Meu Ciclo", type="primary"):
+        overwrite_data("cronograma", ed_crono)
+        st.success("Ordem do ciclo salva com sucesso! Você pode acompanhá-la na aba de Gestão de Dados.")
+        st.rerun()
 
 elif page == "Gestão de Dados":
     st.title("⚙️ Painel de Controle")
