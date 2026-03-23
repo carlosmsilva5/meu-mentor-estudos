@@ -360,65 +360,72 @@ elif page == "Registrar Estudo":
 elif page == "Ciclo de Estudos":
     st.title("🎯 Planejamento do Ciclo")
     
-    # 1. Busca as disciplinas cadastradas
+    # 1. Busca TODAS as disciplinas cadastradas (Garantia de leitura da aba 'materias')
     try:
         df_materias_atu = conn.read(worksheet="materias")
         lista_disciplinas_ciclo = df_materias_atu['materia'].dropna().unique().tolist()
     except:
-        lista_disciplinas_ciclo = ["Português", "Direito Constitucional", "Direito Administrativo"]
+        lista_disciplinas_atu = ["Português", "Direito Constitucional", "Direito Administrativo"]
 
-    # 2. Configuração de Carga Semanal
-    st.markdown('<div class="giro-badge">🔄 Configuração de Carga Horária</div>', unsafe_allow_html=True)
-    horas_semana = st.number_input("Horas totais pretendidas na semana:", 5, 100, 20)
+    # 2. Configuração de Carga Semanal (O motor do cálculo)
+    st.markdown('<div class="giro-badge">🔄 Carga Horária Semanal Total</div>', unsafe_allow_html=True)
+    horas_semana = st.number_input("Quantas horas você pretende estudar na semana?", 5, 100, 20)
     
     st.divider()
+    st.subheader("Disciplinas e Ajustes do Ciclo")
 
-    # --- 3. INPUTS INVISÍVEIS PARA CÁLCULO ---
-    # Criamos uma seção discreta para os inputs de Peso/Nível
-    dados_para_calculo = []
-    
-    with st.expander("⚙️ Ajustar Pesos e Níveis (Clique para abrir)", expanded=True):
-        cols_input = st.columns(3)
-        for i, materia_nome in enumerate(lista_disciplinas_ciclo):
-            with cols_input[i % 3]:
-                st.write(f"**{materia_nome}**")
-                p = st.number_input("Peso", 1, 5, 3, key=f"p_c_{materia_nome}")
-                n = st.number_input("Nível", 1, 5, 3, key=f"n_c_{materia_nome}")
-                g = st.number_input("Giros", 1, 10, 1, key=f"g_c_{materia_nome}")
+    # --- 3. CRIAÇÃO DOS CARDS INTEGRADOS ---
+    # Primeiro, criamos um dicionário para guardar os inputs antes do cálculo final
+    inputs_ciclo = {}
+    cols = st.columns(3)
+
+    for i, materia in enumerate(lista_disciplinas_ciclo):
+        with cols[i % 3]:
+            # Início do Card Escuro
+            st.markdown(f"""
+                <div style="background: #3a3b3c; border: 1px solid #4f4f4f; padding: 15px; border-radius: 10px 10px 0 0; text-align: center; border-top: 4px solid #3ec6a8;">
+                    <b style="color:white; font-size: 16px;">{materia}</b>
+                </div>
+            """, unsafe_allow_html=True)
+            
+            # Área de Inputs dentro do "corpo" do card (usando colunas menores)
+            with st.container():
+                # Aplicamos um fundo levemente diferente para os inputs parecerem parte do card
+                c1, c2 = st.columns(2)
+                p = c1.number_input("Peso", 1, 5, 3, key=f"p_int_{materia}")
+                n = c2.number_input("Nível", 1, 5, 3, key=f"n_int_{materia}")
+                g = st.number_input("Giros no Ciclo", 1, 10, 1, key=f"g_int_{materia}")
                 
-                fator = p / n
-                dados_para_calculo.append({
-                    "materia": materia_nome, 
-                    "fator": fator, 
-                    "peso": p, 
-                    "nivel": n, 
-                    "giros": g
-                })
-                st.divider()
+                # Guardamos os valores para o cálculo
+                inputs_ciclo[materia] = {"fator": p/n, "peso": p, "nivel": n, "giros": g}
 
-    # --- 4. CÁLCULO DAS HORAS ---
-    df_c = pd.DataFrame(dados_para_calculo)
+    # --- 4. CÁLCULO DINÂMICO ---
+    df_c = pd.DataFrame.from_dict(inputs_ciclo, orient='index').reset_index()
+    df_c.columns = ['materia', 'fator', 'peso', 'nivel', 'giros']
     soma_fatores = df_c["fator"].sum()
-    df_c["horas_calculadas"] = (df_c["fator"] / soma_fatores) * horas_semana if soma_fatores > 0 else 0
+    df_c["horas_calc"] = (df_c["fator"] / soma_fatores) * horas_semana if soma_fatores > 0 else 0
 
-    # --- 5. EXIBIÇÃO DOS CARDS FINAIS (COMO NA SUA IMAGEM) ---
-    st.subheader("Distribuição da Carga Horária")
+    st.divider()
+    
+    # --- 5. EXIBIÇÃO DO RESULTADO (META DE TEMPO) DENTRO DO CARD ---
+    st.subheader("Meta de Tempo por Disciplina")
     res_cols = st.columns(3)
 
     for idx, row in df_c.iterrows():
-        tempo_fmt = decimal_para_horas(row["horas_calculadas"])
+        tempo_fmt = decimal_para_horas(row["horas_calc"])
         with res_cols[idx % 3]:
-            # Card com Nome e Meta dentro
             st.markdown(f"""
-                <div style="background: #3a3b3c; border: 1px solid #4f4f4f; padding: 15px; border-radius: 10px; text-align: center; border-top: 4px solid #3ec6a8; margin-bottom: 20px;">
-                    <b style="color:white; font-size: 16px;">{row['materia']}</b><br>
-                    <span style="color:#3ec6a8; font-size: 22px; font-weight: bold;">{tempo_fmt}</span><br>
-                    <small style="color:gray;">Peso {row['peso']} | Nível {row['nivel']} | {row['giros']} Giro(s)</small>
+                <div style="background: #202225; border: 1px solid #3ec6a8; padding: 15px; border-radius: 10px; text-align: center; margin-bottom: 20px;">
+                    <small style="color: #3ec6a8; font-weight: bold;">META SEMANAL</small><br>
+                    <span style="color:white; font-size: 24px; font-weight: bold;">{tempo_fmt}</span><br>
+                    <small style="color:gray;">{row['materia']}</small>
                 </div>
             """, unsafe_allow_html=True)
 
-    if st.button("Salvar este Ciclo", type="primary", use_container_width=True):
-        st.success("Configuração de ciclo aplicada!")
+    if st.button("💾 Salvar este Planejamento", type="primary", use_container_width=True):
+        # Aqui enviamos para a aba de cronograma do Sheets
+        # (Lógica de salvamento opcional aqui)
+        st.success("Ciclo planejado e pronto para execução!")
                                      
 
 elif page == "Gestão de Dados":
