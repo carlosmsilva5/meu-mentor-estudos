@@ -442,15 +442,51 @@ elif page == "Ciclo de Estudos":
     
     for giro_num in range(1, max_giros + 1):
         df_g = df_c[df_c["giros"] >= giro_num].sort_values("horas", ascending=False)
-        for _, r in df_g.iterrows():
-            tempo_bloco = r["horas"] / r["giros"]
-            blocos.append({
-                "Ordem": ordem_idx,
-                "Disciplina": r["materia"],
-                "Giro": giro_num, # <--- COLUNA DO GIRO AQUI
-                "Tempo": decimal_para_horas(tempo_bloco)
+        # --- NOVOS CARDS DE AJUSTE DINÂMICO ---
+    st.subheader("Distribuição da Carga Horária")
+    
+    # Criamos as colunas para os cards
+    cols = st.columns(3)
+    
+    # Lista para armazenar os novos dados ajustados
+    novos_dados_ajustados = []
+
+    for i, materia_nome in enumerate(lista_disciplinas):
+        with cols[i % 3]:
+            # Iniciamos o container do Card
+            st.markdown(f"""
+                <div style="background: #3a3b3c; border: 1px solid #4f4f4f; padding: 15px; border-radius: 10px; text-align: center; border-top: 4px solid white; margin-bottom: 10px;">
+                    <b style="color:white; font-size: 18px;">{materia_nome}</b>
+                </div>
+            """, unsafe_allow_html=True)
+            
+            # Controles de Peso e Nível dentro do card (sem expander)
+            c_ajuste1, c_ajuste2 = st.columns(2)
+            with c_ajuste1:
+                p = st.number_input("Peso", 1, 5, 3, key=f"p_{materia_nome}")
+            with c_ajuste2:
+                n = st.number_input("Nível", 1, 5, 3, key=f"n_{materia_nome}")
+            
+            g = st.number_input("Giros", 1, 14, 1, key=f"g_{materia_nome}")
+            
+            # Cálculo do fator (Peso / Nível)
+            fator = p / n
+            novos_dados_ajustados.append({
+                "materia": materia_nome, 
+                "fator": fator, 
+                "peso": p, 
+                "nivel": n, 
+                "giros": g
             })
-            ordem_idx += 1
+            
+            st.markdown("---")
+
+    # Recalcula as horas baseado nos novos inputs dos cards
+    df_c = pd.DataFrame(novos_dados_ajustados)
+    df_c["horas"] = (df_c["fator"] / df_c["fator"].sum()) * horas_semana
+
+    # Exibe o resultado do tempo calculado logo abaixo de cada card (opcional, ou manter global)
+    st.info("💡 As horas abaixo são calculadas automaticamente com base nos Pesos e Níveis acima.")
             
     df_sugestao = pd.DataFrame(blocos)
     
