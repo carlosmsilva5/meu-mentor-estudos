@@ -403,75 +403,69 @@ elif page == "Caderno de Erros":
         st.info("Você ainda não registrou nenhum erro no caderno. Bom trabalho (ou vá fazer mais questões!) 😉")
     
    
-elif page == "Ciclo de Estudos":
-    st.title("🎯 Cronograma da Semana")
+elif page == "🎯 Ciclo de Estudos":
+    st.title("🎯 Planejamento do Ciclo")
     
-    giro = calcular_giro_atual(df_estudo)
-    st.markdown(f'<div class="giro-badge">🔄 Você está no Giro {giro} do Ciclo Global</div>', unsafe_allow_html=True)
-    st.markdown("Ajuste a carga horária baseada na sua dificuldade (Nível) e importância para o edital (Peso).")
-    
-    horas_semana = st.number_input("Horas pretendidas no ciclo:", 5, 100, 25)
-    
-    dados_ciclo = []
-    for m in materias_list:
-        with st.expander(f"Ajustar: {m}", expanded=False):
-            c1, c2, c3 = st.columns(3)
-            p = c1.select_slider("Peso no Edital", [1,2,3,4,5], 3, key=f"p_{m}")
-            n = c2.select_slider("Seu Nível", [1,2,3,4,5], 3, key=f"n_{m}")
-            # A meta de giros aqui serve apenas para o cálculo inicial da sugestão
-            g = c3.number_input("Meta de Giros", min_value=1, max_value=14, value=1, step=1, key=f"g_{m}")
-            dados_ciclo.append({"materia": m, "fator": p/n, "peso": p, "nivel": n, "giros": g})
+    # 1. Entrada de Dados e Gráfico
+    c_t1, c_t2 = st.columns([1, 2])
+    with c_t1:
+        horas_semana = st.number_input("Horas Totais na Semana", 5, 100, 20)
+        st.info("Ajuste os pesos nos cards abaixo.")
 
-    df_c = pd.DataFrame(dados_ciclo)
-    df_c["horas"] = (df_c["fator"] / df_c["fator"].sum()) * horas_semana
+    # 2. Loop de Matérias (Criação dos Pesos)
+    dados_temp = []
+    st.write("---")
+    cols_ciclo = st.columns(3)
     
-    st.subheader("Distribuição da Carga Horária")
-    cols = st.columns(3)
-    for i, r in df_c.iterrows():
-        with cols[i % 3]:
-            st.markdown(f'<div class="ciclo-card"><b style="color:white">{r["materia"]}</b><br><h3 style="color:#3ec6a8">{decimal_para_horas(r["horas"])}</h3><small style="color:gray">Peso {r["peso"]} | Nível {r["nivel"]} | Meta: {r["giros"]} Giro(s)</small></div>', unsafe_allow_html=True)
+    for i, m in enumerate(materias_list):
+        with cols_ciclo[i % 3]:
+            st.markdown(f"### {m}")
+            p = st.select_slider("Peso", options=[1, 2, 3, 4, 5], value=3, key=f"p_{m}")
+            n = st.select_slider("Nível", options=[1, 2, 3, 4, 5], value=3, key=f"n_{m}")
+            fator = p/n
+            dados_temp.append({"materia": m, "fator": fator})
 
-    st.divider()
-    st.subheader("🗓️ Ordem do Ciclo (Sugestão Editável)")
-    st.markdown("Abaixo está a sugestão intercalando as matérias. **Dê um clique duplo na tabela para editar a Disciplina, o número do Giro ou o Tempo!**")
-    
-    # Gerando a ordem sugerida dinamicamente baseada nos giros
-    blocos = []
-    ordem_idx = 1
-    max_giros = int(df_c["giros"].max()) if not df_c.empty else 1
-    
-    for giro_num in range(1, max_giros + 1):
-        df_g = df_c[df_c["giros"] >= giro_num].sort_values("horas", ascending=False)
-        for _, r in df_g.iterrows():
-            tempo_bloco = r["horas"] / r["giros"]
-            blocos.append({
-                "Ordem": ordem_idx,
-                "Disciplina": r["materia"],
-                "Giro": giro_num, # <--- COLUNA DO GIRO AQUI
-                "Tempo": decimal_para_horas(tempo_bloco)
-            })
-            ordem_idx += 1
-            
-    df_sugestao = pd.DataFrame(blocos)
-    
-    # Tabela com campos editáveis (para alterar o giro diretamente)
-    ed_crono = st.data_editor(
-        df_sugestao,
-        use_container_width=True,
-        hide_index=True,
-        column_config={
-            "Ordem": st.column_config.NumberColumn("Fila", disabled=True),
-            "Disciplina": st.column_config.SelectboxColumn("Disciplina", options=materias_list),
-            "Giro": st.column_config.NumberColumn("Nº do Giro", min_value=1, max_value=20), # <--- CAMPO EDITÁVEL
-            "Tempo": st.column_config.TextColumn("Tempo do Bloco")
-        },
-        key="ed_ordem_ciclo"
-    )
-    
-    if st.button("Salvar Meu Ciclo", type="primary"):
-        overwrite_data("cronograma", ed_crono)
-        st.success("Ordem do ciclo salva com sucesso! Você pode acompanhá-la na aba de Gestão de Dados.")
-        st.rerun()
+    # 3. Processamento de Cálculos
+    df_c = pd.DataFrame(dados_temp)
+    if not df_c.empty:
+        total_f = df_c["fator"].sum()
+        df_c["horas"] = (df_c["fator"] / total_f) * horas_semana
+        
+        # Exibição do Gráfico de Pizza no Topo
+        with c_t2:
+            cores = ['#FFB7B2', '#FFDAC1', '#E2F0CB', '#B5EAD7', '#C7CEEA', '#F3D1F4']
+            fig_p = px.pie(df_c, values='horas', names='materia', hole=0.4, color_discrete_sequence=cores)
+            fig_p.update_traces(textinfo='label+percent', textposition='inside')
+            fig_p.update_layout(showlegend=False, margin=dict(l=0, r=0, t=0, b=0), paper_bgcolor='rgba(0,0,0,0)', font=dict(color="white"))
+            st.plotly_chart(fig_p, use_container_width=True, config={'staticPlot': True})
+
+        # 4. Cards de Tempo Sugerido
+        st.write("### 📅 Tempo por Disciplina")
+        c_res = st.columns(4)
+        for idx, row in df_c.iterrows():
+            t_fmt = decimal_para_horas(row['horas'])
+            with c_res[idx % 4]:
+                st.metric(label=row['materia'], value=t_fmt)
+
+        # 5. Tabela de Ordem (HTML Simplificado para evitar erros)
+        st.write("---")
+        st.subheader("🗓️ Sugestão de Ciclo")
+        df_p = df_c.sort_values("fator", ascending=False).reset_index()
+        
+        def get_m(idx):
+            return df_p.iloc[idx % len(df_p)]['materia'] if not df_p.empty else "-"
+
+        st.markdown(f"""
+        | Dia | Foco | Giro |
+        | :--- | :--- | :--- |
+        | **Seg** | {get_m(0)} | {get_m(len(df_p)-1)} |
+        | **Ter** | {get_m(1)} | {get_m(len(df_p)-2)} |
+        | **Qua** | {get_m(2)} | {get_m(0)} |
+        | **Qui** | {get_m(3)} | {get_m(1)} |
+        | **Sex** | {get_m(0)} | {get_m(2)} |
+        | **Sáb** | {get_m(1)} | {get_m(3)} |
+        | **Dom** | Revisão Geral | Simulado |
+        """, unsafe_allow_html=True)
 
 elif page == "Gestão de Dados":
     st.title("⚙️ Painel de Controle")
