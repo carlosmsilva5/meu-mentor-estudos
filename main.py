@@ -544,12 +544,48 @@ elif page == "Gestão de Dados":
             st.rerun()
 
     with t2:
-        nova = st.text_input("Nova Matéria")
-        if st.button("Adicionar Disciplina"):
-            nova_lista = ",".join(materias_list + [nova])
-            overwrite_data("config", pd.DataFrame([{"materias": nova_lista}]))
-            st.success(f"{nova} adicionada!")
+        st.markdown("### 📚 Gerenciar Disciplinas")
+        st.info("Aqui você pode adicionar, editar o nome ou excluir disciplinas do seu app.")
+
+        # 1. Busca a lista atual de matérias da aba 'materias'
+        try:
+            # Lendo a aba de matérias (certifique-se que o nome na planilha é 'materias')
+            df_materias_gestao = conn.read(worksheet="materias")
+        except:
+            df_materias_gestao = pd.DataFrame(columns=["materia"])
+
+        # 2. Editor de Tabela (Permite editar o nome clicando na célula ou excluir a linha)
+        st.write("Dica: Para excluir, selecione a linha e aperte 'Delete' no teclado ou use o ícone de lixeira.")
+        ed_materias = st.data_editor(
+            df_materias_gestao, 
+            num_rows="dynamic", # Permite adicionar e excluir linhas
+            key="ed_materias_btn", 
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "materia": st.column_config.TextColumn("Nome da Disciplina", help="Clique para editar o nome")
+            }
+        )
+
+        # 3. Botão para Salvar as Alterações
+        if st.button("Salvar Alterações de Disciplinas", type="primary"):
+            # Limpa o cache para que o Ciclo de Estudos e o Registro leiam os novos nomes
+            st.cache_data.clear()
+            overwrite_data("materias", ed_materias)
+            st.success("Lista de disciplinas atualizada com sucesso!")
             st.rerun()
+
+        st.divider()
+        
+        # 4. Formulário rápido para adicionar (opcional, já que o editor acima faz isso)
+        with st.expander("➕ Adição Rápida"):
+            nova_m = st.text_input("Nome da nova disciplina", key="input_nova_m")
+            if st.button("Adicionar"):
+                if nova_m:
+                    novo_df = pd.concat([df_materias_gestao, pd.DataFrame([{"materia": nova_m}])], ignore_index=True)
+                    overwrite_data("materias", novo_df)
+                    st.success(f"{nova_m} adicionada!")
+                    st.rerun()
             
     with t3:
         st.markdown("### Editar Histórico de Sessões")
