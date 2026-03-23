@@ -402,7 +402,7 @@ elif page == "Caderno de Erros":
     else:
         st.info("Você ainda não registrou nenhum erro no caderno. Bom trabalho (ou vá fazer mais questões!) 😉")
     
-   elif page == "🎯 Ciclo de Estudos":
+elif page == "🎯 Ciclo de Estudos":
     st.title("🎯 Planejamento do Ciclo")
     horas_semana = st.number_input("Horas Totais na Semana", 5, 100, 20)
     st.divider()
