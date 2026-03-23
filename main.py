@@ -250,11 +250,9 @@ if page == "Home":
             
             # 2. Gráfico 1: Horas Estudadas
             st.subheader("Evolução de Carga Horária (7 Dias)")
-            fig_horas = px.line(evol, x='data_str', y='horas_estudo', markers=True, color_discrete_sequence=['#3ec6a8'], hover_data={'data_str':False, 'horas_estudo':':.1f h'}, render_mode='svg')
-            # CONFIGURAÇÃO DO MOUSE (HOVER)
-            fig_horas.update_traces(
-                hovertemplate="<b>Data:</b> %{x}<br><b>Tempo:</b> %{y}h<extra></extra>"
-            )
+            fig_horas = px.line(evol, x='data_str', y='horas_estudo', markers=True, text='horas_estudo', color_discrete_sequence=['#3ec6a8'])
+fig_horas.update_traces(textposition="top center", texttemplate='%{text}h')
+
             fig_horas.update_layout(
                 yaxis=dict(rangemode='tozero', gridcolor='#4f4f4f'), 
                 xaxis=dict(gridcolor='#4f4f4f'),
@@ -265,11 +263,9 @@ if page == "Home":
 
             # 3. Gráfico 2: Desempenho %
             st.subheader("Desempenho Geral (7 Dias)")
-            fig_desempenho = px.line(
-                evol, x='data_str', y='perc_acerto', 
-                markers=True, color_discrete_sequence=['#ffffff'],
-                labels={'perc_acerto': '% Acertos', 'data_str': 'Data'}
-            )
+            fig_desempenho = px.line(evol, x='data_str', y='perc_acerto', markers=True, text='perc_acerto', color_discrete_sequence=['#ffffff'])
+fig_desempenho.update_traces(textposition="top center", texttemplate='%{text}%')
+
             # CONFIGURAÇÃO DO MOUSE (HOVER)
             fig_desempenho.update_traces(
                 hovertemplate="<b>Data:</b> %{x}<br><b>Acertos:</b> %{y}%<extra></extra>"
