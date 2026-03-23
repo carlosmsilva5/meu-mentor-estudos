@@ -405,55 +405,72 @@ elif page == "Caderno de Erros":
    
 elif page == "Ciclo de Estudos":
     st.title("🎯 Cronograma da Semana")
-    st.markdown("Ajuste a carga baseada no **Peso** (importância) e **Nível** (sua base).")
+    
+    giro = calcular_giro_atual(df_estudo)
+    st.markdown(f'<div class="giro-badge">🔄 Você está no Giro {giro} do Ciclo Global</div>', unsafe_allow_html=True)
+    st.markdown("Ajuste a carga horária baseada na sua dificuldade (Nível) e importância para o edital (Peso).")
     
     horas_semana = st.number_input("Horas pretendidas no ciclo:", 5, 100, 25)
     
     dados_ciclo = []
     for m in materias_list:
-        with st.expander(f"Configurar: {m}", expanded=False):
-            c1, c2 = st.columns(2)
-            p = c1.select_slider("Peso", [1,2,3,4,5], 3, key=f"p_{m}")
-            n = c2.select_slider("Nível", [1,2,3,4,5], 3, key=f"n_{m}")
-            dados_ciclo.append({"materia": m, "fator": p/n, "peso": p, "nivel": n})
+        with st.expander(f"Ajustar: {m}", expanded=False):
+            c1, c2, c3 = st.columns(3)
+            p = c1.select_slider("Peso no Edital", [1,2,3,4,5], 3, key=f"p_{m}")
+            n = c2.select_slider("Seu Nível", [1,2,3,4,5], 3, key=f"n_{m}")
+            # A meta de giros aqui serve apenas para o cálculo inicial da sugestão
+            g = c3.number_input("Meta de Giros", min_value=1, max_value=14, value=1, step=1, key=f"g_{m}")
+            dados_ciclo.append({"materia": m, "fator": p/n, "peso": p, "nivel": n, "giros": g})
 
     df_c = pd.DataFrame(dados_ciclo)
-    if not df_c.empty:
-        df_c["horas"] = (df_c["fator"] / df_c["fator"].sum()) * horas_semana
+    df_c["horas"] = (df_c["fator"] / df_c["fator"].sum()) * horas_semana
     
     st.subheader("Distribuição da Carga Horária")
     cols = st.columns(3)
     for i, r in df_c.iterrows():
         with cols[i % 3]:
-            st.markdown(f"""
-                <div class="ciclo-card" style="padding: 20px; border: 1px solid #4f4f4f; border-radius: 10px; background: #262730; text-align: center;">
-                    <div style="background: rgba(62, 198, 168, 0.2); padding: 8px; border-radius: 5px; margin-bottom: 12px;">
-                        <b style="color:#3ec6a8; font-size: 14px;">{r["materia"]}</b>
-                    </div>
-                    <small style="color:#888;">TEMPO SUGERIDO:</small>
-                    <h2 style="color:white; margin:5px 0;">{decimal_para_horas(r["horas"])}</h2>
-                    <div style="border-top: 1px solid #333; margin-top: 10px; padding-top: 8px;">
-                        <span style="color:#666; font-size: 11px;">PESO {r["peso"]} | NÍVEL {r["nivel"]}</span>
-                    </div>
-                </div>
-            """, unsafe_allow_html=True)
+            st.markdown(f'<div class="ciclo-card"><b style="color:white">{r["materia"]}</b><br><h3 style="color:#3ec6a8">{decimal_para_horas(r["horas"])}</h3><small style="color:gray">Peso {r["peso"]} | Nível {r["nivel"]} | Meta: {r["giros"]} Giro(s)</small></div>', unsafe_allow_html=True)
 
     st.divider()
-    st.subheader("🗓️ Ordem do Ciclo (Sugestão)")
+    st.subheader("🗓️ Ordem do Ciclo (Sugestão Editável)")
+    st.markdown("Abaixo está a sugestão intercalando as matérias. **Dê um clique duplo na tabela para editar a Disciplina, o número do Giro ou o Tempo!**")
     
+    # Gerando a ordem sugerida dinamicamente baseada nos giros
     blocos = []
-    if not df_c.empty:
-        df_prioridade = df_c.sort_values("horas", ascending=False).reset_index()
-        for idx, r in df_prioridade.iterrows():
-            blocos.append({"Ordem": idx + 1, "Disciplina": r["materia"], "Tempo": decimal_para_horas(r["horas"])})
+    ordem_idx = 1
+    max_giros = int(df_c["giros"].max()) if not df_c.empty else 1
+    
+    for giro_num in range(1, max_giros + 1):
+        df_g = df_c[df_c["giros"] >= giro_num].sort_values("horas", ascending=False)
+        for _, r in df_g.iterrows():
+            tempo_bloco = r["horas"] / r["giros"]
+            blocos.append({
+                "Ordem": ordem_idx,
+                "Disciplina": r["materia"],
+                "Giro": giro_num, # <--- COLUNA DO GIRO AQUI
+                "Tempo": decimal_para_horas(tempo_bloco)
+            })
+            ordem_idx += 1
             
     df_sugestao = pd.DataFrame(blocos)
-    ed_crono = st.data_editor(df_sugestao, use_container_width=True, hide_index=True, key="ed_ordem_ciclo")
+    
+    # Tabela com campos editáveis (para alterar o giro diretamente)
+    ed_crono = st.data_editor(
+        df_sugestao,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Ordem": st.column_config.NumberColumn("Fila", disabled=True),
+            "Disciplina": st.column_config.SelectboxColumn("Disciplina", options=materias_list),
+            "Giro": st.column_config.NumberColumn("Nº do Giro", min_value=1, max_value=20), # <--- CAMPO EDITÁVEL
+            "Tempo": st.column_config.TextColumn("Tempo do Bloco")
+        },
+        key="ed_ordem_ciclo"
+    )
     
     if st.button("Salvar Meu Ciclo", type="primary"):
-        st.cache_data.clear()
         overwrite_data("cronograma", ed_crono)
-        st.success("Ciclo salvo!")
+        st.success("Ordem do ciclo salva com sucesso! Você pode acompanhá-la na aba de Gestão de Dados.")
         st.rerun()
 
 elif page == "Gestão de Dados":
