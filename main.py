@@ -1,3 +1,4 @@
+
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
@@ -193,80 +194,43 @@ if page == "Home":
             # --- RECUPERAÇÃO DO GRÁFICO RADAR (ESTILO PREMIUM MANTIDO) ---
             painel_completo["aproveitamento"] = (painel_completo["q_acertos"] / painel_completo["q_total"] * 100).fillna(0)
             
-            # 1. Import necessário (adicione no topo do arquivo se não tiver)
-            # import plotly.graph_objects as go
+            # 1. Definir a cor dinâmica baseada na média de aproveitamento
+            media_aprov = painel_completo["aproveitamento"].mean()
+            if media_aprov >= 90: cor_radar = "#2ecc71"    # Verde
+            elif media_aprov >= 80: cor_radar = "#f1c40f"  # Amarelo
+            elif media_aprov >= 70: cor_radar = "#e67e22"  # Laranja
+            else: cor_radar = "#e74c3c"                    # Vermelho
 
-            # 2. Configuração de Cores Dinâmicas
+            # 2. Criar o gráfico com a cor definida
+            fig_radar = px.line_polar(
+                painel_completo, 
+                r='aproveitamento', 
+                theta='materia', 
+                line_close=True,
+                markers=True,
+                color_discrete_sequence=[cor_radar]
+            )
             
-            # Cor para o PREENCHIMENTO (Baseado na Média Geral)
-            media_geral = painel_completo["aproveitamento"].mean()
-            if media_geral >= 90: cor_preenchimento = "#2ecc71"    # Verde
-            elif media_geral >= 80: cor_preenchimento = "#f1c40f"  # Amarelo
-            elif media_geral >= 70: cor_preenchimento = "#e67e22"  # Laranja
-            else: cor_preenchimento = "#e74c3c"                    # Vermelho
+            # Preenche a área com a cor dinâmica e transparência (0.3)
+            fig_radar.update_traces(fill='toself', fillcolor=cor_radar, opacity=0.3)
 
-            # Função para definir a cor de CADA PONTO (Baseado no aproveitamento individual)
-            def get_color_individual(valor):
-                if valor >= 90: return "#2ecc71"
-                elif valor >= 80: return "#f1c40f"
-                elif valor >= 70: return "#e67e22"
-                else: return "#e74c3c"
-
-            # Cria a lista de cores para os pontos
-            cores_pontos = painel_completo["aproveitamento"].apply(get_color_individual).tolist()
-
-            # --- CONSTRUÇÃO DO GRÁFICO (go.Figure) ---
-            fig_radar = go.Figure()
-
-            # TRAÇO 1: Área Preenchida (Cor da Média Geral)
-            fig_radar.add_trace(go.Scatterpolar(
-                r=painel_completo["aproveitamento"].tolist(),
-                theta=painel_completo["materia"].tolist(),
-                fill='toself',
-                fillcolor=cor_preenchimento,
-                opacity=0.3, # Transparência da área
-                line=dict(color=cor_preenchimento, width=2), # Cor da linha
-                marker=dict(visible=False), # Esconde os pontos deste traço
-                hoverinfo='skip' # Ignora o hover neste traço
-            ))
-
-            # TRAÇO 2: Pontos Coloridos (Cores Individuais)
-            fig_radar.add_trace(go.Scatterpolar(
-                r=painel_completo["aproveitamento"].tolist(),
-                theta=painel_completo["materia"].tolist(),
-                mode='markers', # Apenas pontos
-                marker=dict(
-                    size=10,
-                    color=cores_pontos, # Lista de cores individuais
-                    line=dict(color='white', width=1) # Borda branca nos pontos
-                ),
-                # Configuração do texto fixo (opcional, se quiser os números)
-                # text=painel_completo["aproveitamento"].round(1).astype(str) + '%',
-                # textposition="top center",
-                hovertemplate="<b>%{theta}</b><br>Aproveitamento: %{r:.1f}%<extra></extra>"
-            ))
-
-            # --- LAYOUT DO GRÁFICO (Imóvel e Sem Números) ---
             fig_radar.update_layout(
                 polar=dict(
                     bgcolor='rgba(0,0,0,0)', 
                     radialaxis=dict(
                         visible=True, 
-                        range=[0, 105], # Travado até 100
+                        range=[0, 100], 
                         color='white', 
                         gridcolor='#4f4f4f',
-                        showticklabels=False # <--- REMOVE OS NÚMEROS INTERNOS
+                        showticklabels=False  # <--- ISSO REMOVE OS NÚMEROS INTERNOS
                     ),
                     angularaxis=dict(color='white', gridcolor='#4f4f4f')
                 ),
                 paper_bgcolor='rgba(0,0,0,0)', 
                 plot_bgcolor='rgba(0,0,0,0)', 
                 font=dict(color='white'),
-                margin=dict(l=40, r=40, t=20, b=20),
-                showlegend=False # Esconde a legenda
+                margin=dict(l=40, r=40, t=20, b=20)
             )
-            
-            # staticPlot: True torna o gráfico imóvel
             st.plotly_chart(fig_radar, use_container_width=True, config={'staticPlot': True})
             # -------------------------------------------------------------
             
