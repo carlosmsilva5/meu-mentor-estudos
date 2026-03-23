@@ -402,108 +402,71 @@ elif page == "Caderno de Erros":
     else:
         st.info("Você ainda não registrou nenhum erro no caderno. Bom trabalho (ou vá fazer mais questões!) 😉")
     
-   
-elif page == "🎯 Ciclo de Estudos":
+   elif page == "🎯 Ciclo de Estudos":
     st.title("🎯 Planejamento do Ciclo")
+    horas_semana = st.number_input("Horas Totais na Semana", 5, 100, 20)
+    st.divider()
     
-    col_topo1, col_topo2 = st.columns([1, 2])
-    
-    with col_topo1:
-        horas_semana = st.number_input("Horas Totais na Semana", 5, 100, 20)
-        st.info("Ajuste os pesos abaixo para equilibrar o gráfico.")
-
-    # 1. Captura de Pesos e Níveis (Interface Compacta)
+    # 1. Captura de Pesos e Níveis (Agora integrada nos Cards)
     dados_temp = []
-    st.write("---")
+    # Criamos colunas para os cards ficarem lado a lado e economizar espaço vertical
     cols_ciclo = st.columns(3) 
     
     for i, m in enumerate(materias_list):
         with cols_ciclo[i % 3]:
-            st.markdown(f'<div style="background:#3a3b3c; padding:8px; border-radius:10px; border-top:4px solid #3ec6a8; text-align:center; margin-bottom:5px;">'
-                        f'<b style="color:#3ec6a8; font-size:13px;">{m}</b></div>', unsafe_allow_html=True)
+            # Início do Card Otimizado
+            st.markdown(f'<div style="background:#3a3b3c; padding:10px; border-radius:10px; border-top:4px solid #3ec6a8; margin-bottom:5px; text-align:center;">'
+                        f'<b style="color:#3ec6a8; font-size:14px;">{m}</b></div>', unsafe_allow_html=True)
             
-            p = st.select_slider(f"Peso", options=[1, 2, 3, 4, 5], value=3, key=f"p_{m}")
-            n = st.select_slider(f"Nível", options=[1, 2, 3, 4, 5], value=3, key=f"n_{m}")
+            # Controles de Peso e Nível pequenos (dentro do mesmo espaço)
+            p = st.select_slider(f"Peso", options=[1, 2, 3, 4, 5], value=3, key=f"p_{m}", help="Peso da matéria no edital")
+            n = st.select_slider(f"Nível", options=[1, 2, 3, 4, 5], value=3, key=f"n_{m}", help="Sua proficiência")
             
             fator = p/n
             dados_temp.append({"materia": m, "fator": fator, "peso": p, "nivel": n})
             
-    # 2. Processamento dos Dados
+    # 2. Cálculos de Horas
     df_c = pd.DataFrame(dados_temp)
     total_fator = df_c["fator"].sum()
     df_c["horas_calculadas"] = (df_c["fator"] / total_fator) * horas_semana
     
-    # 3. Gráfico de Pizza (Ciclo Visual em Cores Pastel)
-    with col_topo2:
-        if not df_c.empty:
-            # Paleta de Cores Pastel
-            cores_pastel = ['#FFB7B2', '#FFDAC1', '#E2F0CB', '#B5EAD7', '#C7CEEA', '#F3D1F4', '#F9FFB2']
-            
-            fig_pizza = px.pie(
-                df_c, 
-                values='horas_calculadas', 
-                names='materia',
-                color_discrete_sequence=cores_pastel,
-                hole=0.4 # Estilo Rosca para ficar mais moderno
-            )
-            
-            fig_pizza.update_traces(
-                textinfo='label+percent',
-                textposition='inside',
-                insidetextorientation='horizontal',
-                marker=dict(line=dict(color='#202225', width=2))
-            )
-            
-            fig_pizza.update_layout(
-                showlegend=False,
-                margin=dict(l=0, r=0, t=0, b=0),
-                paper_bgcolor='rgba(0,0,0,0)',
-                font=dict(size=14, color="white")
-            )
-            
-            st.plotly_chart(fig_pizza, use_container_width=True, config={'staticPlot': True})
-
-    # 4. Cards de Tempo Sugerido
-    st.write("### 📅 Carga Horária por Disciplina")
-    cols_res = st.columns(4)
+    # 3. Exibição do Resultado (O "Caixote" com a Hora disponível)
+    st.write("### 📅 Carga Horária Sugerida")
+    cols_res = st.columns(3)
     for idx, row in df_c.iterrows():
         tempo_fmt = decimal_para_horas(row['horas_calculadas'])
-        with cols_res[idx % 4]:
+        with cols_res[idx % 3]:
+            # Card menor e direto ao ponto
             st.markdown(
-                f'<div style="background:#2b2d2e; padding:10px; border-radius:8px; border-left:5px solid #3ec6a8; margin-bottom:10px;">'
-                f'<div style="font-size:11px; color:#b0b3b8;">{row["materia"]}</div>'
-                f'<div style="font-size:18px; font-weight:bold; color:#ffffff;">{tempo_fmt}</div>'
+                f'<div class="ciclo-card" style="padding:8px; margin-bottom:10px;">'
+                f'<div style="font-size:12px; color:#b0b3b8;">{row["materia"]}</div>'
+                f'<div style="font-size:20px; font-weight:bold; color:#ffffff;">{tempo_fmt}</div>'
                 f'</div>', 
                 unsafe_allow_html=True
             )
 
-    # 5. Tabela de Ordem Semanal
+    # 4. Tabela de Ordem Semanal (Baseada na Ordem de Prioridade Real)
     st.write("---")
-    st.subheader("🗓️ Ordem de Prioridade no Ciclo")
+    st.subheader("🗓️ Ordem Semanal Sugerida")
     df_prioridade = df_c.sort_values("fator", ascending=False).reset_index()
     
-    # Lógica para preencher a tabela de 7 dias baseada no peso do ciclo
     def get_m(idx):
-        if df_prioridade.empty: return "-"
-        return df_prioridade.iloc[idx % len(df_prioridade)]['materia']
+        return df_prioridade.iloc[idx % len(df_prioridade)]['materia'] if not df_prioridade.empty else "-"
 
     html_tabela = f"""
-    <div style="overflow-x:auto;">
-    <table style="width:100%; border-collapse: collapse; background:#3a3b3c; border-radius:10px;">
-        <tr style="background:#202225; color:#3ec6a8;">
-            <th style="padding:10px;">Dia</th><th style="padding:10px;">Matéria 1 (Foco)</th><th style="padding:10px;">Matéria 2 (Giro)</th>
-        </tr>
-        <tr><td style="padding:10px; text-align:center;">Seg</td><td style="padding:10px; text-align:center;">{get_m(0)}</td><td style="padding:10px; text-align:center;">{get_m(len(df_prioridade)-1)}</td></tr>
-        <tr><td style="padding:10px; text-align:center;">Ter</td><td style="padding:10px; text-align:center;">{get_m(1)}</td><td style="padding:10px; text-align:center;">{get_m(len(df_prioridade)-2)}</td></tr>
-        <tr><td style="padding:10px; text-align:center;">Qua</td><td style="padding:10px; text-align:center;">{get_m(2)}</td><td style="padding:10px; text-align:center;">{get_m(0)}</td></tr>
-        <tr><td style="padding:10px; text-align:center;">Qui</td><td style="padding:10px; text-align:center;">{get_m(3)}</td><td style="padding:10px; text-align:center;">{get_m(1)}</td></tr>
-        <tr><td style="padding:10px; text-align:center;">Sex</td><td style="padding:10px; text-align:center;">{get_m(0)}</td><td style="padding:10px; text-align:center;">{get_m(2)}</td></tr>
-        <tr><td style="padding:10px; text-align:center;">Sáb</td><td style="padding:10px; text-align:center;">{get_m(1)}</td><td style="padding:10px; text-align:center;">{get_m(3)}</td></tr>
-        <tr><td style="padding:10px; text-align:center;">Dom</td><td style="padding:10px; text-align:center; color:#ffb7b2;" colspan="2">Revisão Geral / Simulado</td></tr>
+    <table class="cronograma-table">
+        <tr><th>Dia</th><th>Principal</th><th>Giro</th></tr>
+        <tr><td class="dia-num">1</td><td>{get_m(0)}</td><td>{get_m(len(df_prioridade)-1)}</td></tr>
+        <tr><td class="dia-num">2</td><td>{get_m(1)}</td><td>{get_m(len(df_prioridade)-2)}</td></tr>
+        <tr><td class="dia-num">3</td><td>{get_m(2)}</td><td>{get_m(len(df_prioridade)-3)}</td></tr>
+        <tr><td class="dia-num">4</td><td>{get_m(3)}</td><td>{get_m(0)}</td></tr>
+        <tr><td class="dia-num">5</td><td>{get_m(4)}</td><td>{get_m(1)}</td></tr>
+        <tr><td class="dia-num">6</td><td>{get_m(0)}</td><td>{get_m(2)}</td></tr>
+        <tr><td class="dia-num">7</td><td>{get_m(1)}</td><td>{get_m(3)}</td></tr>
     </table>
-    </div>
     """
     st.markdown(html_tabela, unsafe_allow_html=True)
+
 
 elif page == "Gestão de Dados":
     st.title("⚙️ Painel de Controle")
