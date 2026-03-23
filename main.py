@@ -141,6 +141,16 @@ if page == "Home":
     st.title("Visão Geral")
     
     # 1. Cálculos de Topo
+    if not df_estudo.empty:
+        df_estudo['tempo_num'] = pd.to_numeric(df_estudo['tempo'], errors='coerce').fillna(0)
+        df_estudo['acertos_num'] = pd.to_numeric(df_estudo['acertos'], errors='coerce').fillna(0)
+        df_estudo['total_q_num'] = pd.to_numeric(df_estudo['total_q'], errors='coerce').fillna(0)
+        # Garante que as novas colunas existam (blindagem)
+        for col in ['paginas', 'humor', 'tipo_estudo']:
+            if col not in df_estudo.columns:
+                df_estudo[col] = 0 if col == 'paginas' else "N/A"
+        df_estudo['paginas_num'] = pd.to_numeric(df_estudo['paginas'], errors='coerce').fillna(0)
+
     t_min = pd.to_numeric(df_estudo['tempo'], errors='coerce').sum() if not df_estudo.empty else 0
     q_tot = pd.to_numeric(df_estudo['total_q'], errors='coerce').sum() if not df_estudo.empty else 0
     q_acc = pd.to_numeric(df_estudo['acertos'], errors='coerce').sum() if not df_estudo.empty else 0
@@ -156,16 +166,6 @@ if page == "Home":
     st.divider()
 
     if not df_estudo.empty:
-        # 2. Tratamento e Criação de Colunas (Evita o erro anterior)
-        for col in ['paginas', 'humor', 'tipo_estudo']:
-            if col not in df_estudo.columns:
-                df_estudo[col] = 0 if col == 'paginas' else "N/A"
-
-        df_estudo['tempo_num'] = pd.to_numeric(df_estudo['tempo'], errors='coerce').fillna(0)
-        df_estudo['acertos_num'] = pd.to_numeric(df_estudo['acertos'], errors='coerce').fillna(0)
-        df_estudo['total_q_num'] = pd.to_numeric(df_estudo['total_q'], errors='coerce').fillna(0)
-        df_estudo['paginas_num'] = pd.to_numeric(df_estudo['paginas'], errors='coerce').fillna(0)
-        
         col_grafico1, col_grafico2 = st.columns(2)
         
         with col_grafico1:
@@ -183,20 +183,47 @@ if page == "Home":
             humor_map = df_estudo.groupby("materia")['humor'].agg(lambda x: x.mode()[0] if not x.mode().empty else "N/A").reset_index()
             painel_disc = pd.merge(painel_disc, humor_map, on="materia", how="left")
             
-            # Divisão de Tempo por Tipo (Teoria, Revisão, Questões)
+            # Divisão de Tempo por Tipo
             df_tipos = df_estudo.groupby(["materia", "tipo_estudo"])["tempo_num"].sum().unstack(fill_value=0).reset_index()
             for t in ["Teoria Novo", "Revisão", "Questões"]:
                 if t not in df_tipos.columns: df_tipos[t] = 0
             
             painel_completo = pd.merge(painel_disc, df_tipos, on="materia", how="left")
             
-            # Formatação da Tabela
+            # --- RECUPERAÇÃO DO GRÁFICO RADAR (ESTILO PREMIUM MANTIDO) ---
+            painel_completo["aproveitamento"] = (painel_completo["q_acertos"] / painel_completo["q_total"] * 100).fillna(0)
+            
+            fig_radar = px.line_polar(
+                painel_completo, 
+                r='aproveitamento', 
+                theta='materia', 
+                line_close=True,
+                markers=True,
+                color_discrete_sequence=['white']
+            )
+            fig_radar.update_traces(fill='toself')
+            fig_radar.update_layout(
+                polar=dict(
+                    bgcolor='rgba(0,0,0,0)', 
+                    radialaxis=dict(visible=True, range=[0, 100], color='white', gridcolor='#4f4f4f'),
+                    angularaxis=dict(color='white', gridcolor='#4f4f4f')
+                ),
+                paper_bgcolor='rgba(0,0,0,0)', 
+                plot_bgcolor='rgba(0,0,0,0)', 
+                font=dict(color='white'),
+                margin=dict(l=40, r=40, t=20, b=20)
+            )
+            st.plotly_chart(fig_radar, use_container_width=True, config={'staticPlot': True})
+            # -------------------------------------------------------------
+            
+            # Formatação da Tabela de Detalhamento (MANTIDA)
+            st.markdown("#### Detalhamento das Matérias")
             tab_v = painel_completo.copy()
             tab_v["Total"] = tab_v["tempo_total"].apply(formatar_tempo)
             tab_v["Teoria"] = tab_v["Teoria Novo"].apply(formatar_tempo)
             tab_v["Rev."] = tab_v["Revisão"].apply(formatar_tempo)
             tab_v["Ques."] = tab_v["Questões"].apply(formatar_tempo)
-            tab_v["Aprov."] = (tab_v["q_acertos"] / tab_v["q_total"] * 100).fillna(0).map("{:.1f}%".format)
+            tab_v["Aprov."] = tab_v["aproveitamento"].map("{:.1f}%".format)
 
             cols_final = ["materia", "Total", "Teoria", "Rev.", "Ques.", "total_pag", "humor", "Aprov."]
             st.dataframe(
@@ -206,7 +233,6 @@ if page == "Home":
 
         with col_grafico2:
             st.subheader("Evolução (7 Dias)")
-            # Lógica de evolução simplificada
             hoje = pd.Timestamp.today().normalize()
             df_dias = pd.DataFrame({'data_fmt': pd.date_range(end=hoje, periods=7)})
             df_estudo['data_fmt'] = pd.to_datetime(df_estudo['data'], format='%d/%m/%Y', errors='coerce')
