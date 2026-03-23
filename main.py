@@ -252,7 +252,6 @@ if page == "Home":
             st.subheader("Evolução de Carga Horária (7 Dias)")
             fig_horas = px.line(evol, x='data_str', y='horas_estudo', markers=True, text='horas_estudo', color_discrete_sequence=['#3ec6a8'])
 fig_horas.update_traces(textposition="top center", texttemplate='%{text}h')
-
             fig_horas.update_layout(
                 yaxis=dict(rangemode='tozero', gridcolor='#4f4f4f'), 
                 xaxis=dict(gridcolor='#4f4f4f'),
@@ -270,7 +269,7 @@ fig_desempenho.update_traces(textposition="top center", texttemplate='%{text}%')
             fig_desempenho.update_traces(
                 hovertemplate="<b>Data:</b> %{x}<br><b>Acertos:</b> %{y}%<extra></extra>"
             )
-            fig_desempenho.add_hline(y=70, line_dash="dash", line_color="#4f4f4f", annotation_text="Meta 70%")
+            fig_desempenho.add_hline(y=70, line_dash="dash", line_color="#4f4f4f", annotation_text="Meta 90%")
             
             fig_desempenho.update_layout(
                 yaxis=dict(range=[0, 105], gridcolor='#4f4f4f'), 
