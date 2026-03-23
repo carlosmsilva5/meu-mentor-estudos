@@ -251,15 +251,45 @@ if page == "Home":
             st.plotly_chart(fig_line, use_container_width=True, config={'staticPlot': True})
 
 elif page == "Registrar Estudo":
-    st.title("Novo Registro")
+    st.title("🧮 Novo Registro")
     with st.form("form_registro", clear_on_submit=True):
-        materia = st.selectbox("Matéria", materias_list)
-        tipo = st.selectbox("Tipo", ["Teoria Novo", "Revisão", "Questões"])
-        tempo = st.number_input("Tempo (min)", 0)
+        col1, col2 = st.columns(2)
+        with col1:
+            materia = st.selectbox("Matéria", materias_list)
+            tipo = st.selectbox("Tipo", ["Teoria Novo", "Revisão", "Questões"])
+        with col2:
+            humor = st.selectbox("Humor/Energia", ["Focado ⚡", "Neutro 😐", "Cansado 😴"])
+            tempo = st.number_input("Tempo total (min)", 0)
+        
+        st.divider()
+        st.markdown("📖 **Leitura de Páginas**")
+        p1, p2 = st.columns(2)
+        p_inicio = p1.number_input("Página Inicial", 0)
+        p_fim = p2.number_input("Página Final", 0)
+        
+        st.divider()
+        st.markdown("📝 **Questões**")
         cq1, cq2 = st.columns(2)
-        q_t, q_a = cq1.number_input("Qtd Questões", 0), cq2.number_input("Acertos", 0)
-        if st.form_submit_button("Salvar"):
-            save_data("progresso", pd.DataFrame([{"data": datetime.now().strftime("%d/%m/%Y"), "materia": materia, "tipo_estudo": tipo, "tempo": tempo, "acertos": q_a, "total_q": q_t}]))
+        q_t = cq1.number_input("Qtd Questões", 0)
+        q_a = cq2.number_input("Acertos", 0)
+        
+        if st.form_submit_button("Salvar Registro"):
+            # Cálculo automático das páginas
+            total_paginas = (p_fim - p_inicio) + 1 if p_fim >= p_inicio and p_fim > 0 else 0
+            
+            novo_dado = pd.DataFrame([{
+                "data": datetime.now().strftime("%d/%m/%Y"), 
+                "materia": materia, 
+                "tipo_estudo": tipo, 
+                "humor": humor,
+                "tempo": tempo, 
+                "paginas": total_paginas,
+                "acertos": q_a, 
+                "total_q": q_t
+            }])
+            
+            save_data("progresso", novo_dado)
+            st.success(f"Estudo salvo! {total_paginas} páginas contabilizadas.")
             st.rerun()
 
 elif page == "Caderno de Erros":
