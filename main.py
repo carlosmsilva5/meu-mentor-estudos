@@ -234,19 +234,35 @@ if page == "Home":
             st.plotly_chart(fig_radar, use_container_width=True, config={'staticPlot': True})
             # -------------------------------------------------------------
             
-            # Formatação da Tabela de Detalhamento (MANTIDA)
+            # --- TABELA DE DETALHAMENTO ATUALIZADA ---
             st.markdown("#### Detalhamento das Matérias")
             tab_v = painel_completo.copy()
+            
+            # Formatação de Tempos
             tab_v["Total"] = tab_v["tempo_total"].apply(formatar_tempo)
             tab_v["Teoria"] = tab_v["Teoria Novo"].apply(formatar_tempo)
             tab_v["Rev."] = tab_v["Revisão"].apply(formatar_tempo)
-            tab_v["Ques."] = tab_v["Questões"].apply(formatar_tempo)
+            tab_v["Ques. (Tempo)"] = tab_v["Questões"].apply(formatar_tempo)
+            
+            # Formatação de Performance
             tab_v["Aprov."] = tab_v["aproveitamento"].map("{:.1f}%".format)
-
-            cols_final = ["materia", "Total", "Teoria", "Rev.", "Ques.", "total_pag", "humor", "Aprov."]
+            
+            # Seleção das Colunas (Incluindo o número de questões 'q_total')
+            cols_final = [
+                "materia", "Total", "Teoria", "Rev.", 
+                "Ques. (Tempo)", "q_total", "total_pag", "humor", "Aprov."
+            ]
+            
+            # Renomeação para exibição limpa
             st.dataframe(
-                tab_v[cols_final].rename(columns={"materia": "Matéria", "total_pag": "Págs", "humor": "Humor"}), 
-                use_container_width=True, hide_index=True
+                tab_v[cols_final].rename(columns={
+                    "materia": "Matéria", 
+                    "q_total": "Nº Quest.", 
+                    "total_pag": "Págs", 
+                    "humor": "Humor"
+                }), 
+                use_container_width=True, 
+                hide_index=True
             )
 
         with col_grafico2:
