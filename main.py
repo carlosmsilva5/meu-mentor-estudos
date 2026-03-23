@@ -250,11 +250,7 @@ if page == "Home":
             
             # 2. Gráfico 1: Horas Estudadas
             st.subheader("Evolução de Carga Horária (7 Dias)")
-            fig_horas = px.line(
-                evol, x='data_str', y='horas_estudo', 
-                markers=True, color_discrete_sequence=['#3ec6a8'],
-                labels={'horas_estudo': 'Horas', 'data_str': 'Data'}
-            )
+            fig_horas = px.line(evol, x='data_str', y='horas_estudo', markers=True, color_discrete_sequence=['#3ec6a8'], hover_data={'data_str':False, 'horas_estudo':':.1f h'}, render_mode='svg')
             # CONFIGURAÇÃO DO MOUSE (HOVER)
             fig_horas.update_traces(
                 hovertemplate="<b>Data:</b> %{x}<br><b>Tempo:</b> %{y}h<extra></extra>"
