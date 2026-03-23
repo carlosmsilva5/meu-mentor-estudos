@@ -234,55 +234,46 @@ if page == "Home":
         with col_grafico2:
             # 1. Preparação dos Dados (7 dias)
             hoje = pd.Timestamp.today().normalize()
-            df_dias = pd.DataFrame({'data_fmt': pd.date_range(end=hoje, periods=7)})
+            df_dias = pd.DataFrame({'data': pd.date_range(end=hoje, periods=7)})
             df_estudo['data_fmt'] = pd.to_datetime(df_estudo['data'], format='%d/%m/%Y', errors='coerce')
             
-            # Agrupa Tempo, Acertos e Total de Questões
             est_agrup = df_estudo.groupby('data_fmt').agg({
                 "tempo_num": "sum",
                 "acertos_num": "sum",
                 "total_q_num": "sum"
             }).reset_index()
             
-            # Mescla com o calendário de 7 dias
-            evol = pd.merge(df_dias, est_agrup, on='data_fmt', how='left').fillna(0)
-            evol['data_str'] = evol['data_fmt'].dt.strftime('%d/%m')
+            evol = pd.merge(df_dias, est_agrup, left_on='data', right_on='data_fmt', how='left').fillna(0)
+            evol['data_label'] = evol['data'].dt.strftime('%d/%m')
+            evol['horas_estudo'] = (evol['tempo_num'] / 60).round(1)
+            evol['perc_acerto'] = (evol['acertos_num'] / evol['total_q_num'] * 100).fillna(0).round(1)
             
-            # 2. Gráfico 1: Horas Estudadas
+            # 2. Gráfico 1: Horas Estudadas (Imóvel com Números Fixos)
             st.subheader("Evolução de Carga Horária (7 Dias)")
-            fig_horas = px.line(
-                evol, x='data_str', y=(evol['tempo_num']/60).round(1), 
-                markers=True, color_discrete_sequence=['#3ec6a8'],
-                labels={'y': 'Horas'}
-            )
+            fig_horas = px.line(evol, x='data_label', y='horas_estudo', markers=True, text='horas_estudo', color_discrete_sequence=['#3ec6a8'])
+            fig_horas.update_traces(textposition="top center", texttemplate='%{text}h')
             fig_horas.update_layout(
-                yaxis=dict(rangemode='tozero', gridcolor='#4f4f4f'), 
-                xaxis=dict(gridcolor='#4f4f4f'),
+                yaxis=dict(rangemode='tozero', gridcolor='#4f4f4f', title="Horas"), 
+                xaxis=dict(gridcolor='#4f4f4f', title="Data"),
                 paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='white'),
-                margin=dict(l=20, r=20, t=20, b=20)
+                margin=dict(l=20, r=20, t=30, b=20)
             )
-            st.plotly_chart(fig_horas, use_container_width=True)
+            # staticPlot: True torna o gráfico imóvel
+            st.plotly_chart(fig_horas, use_container_width=True, config={'staticPlot': True})
 
-            # 3. Gráfico 2: Desempenho % (Acertos)
+            # 3. Gráfico 2: Desempenho Geral (Imóvel com Números Fixos)
             st.subheader("Desempenho Geral (7 Dias)")
-            # Calcula a % de acerto diária. Se não fez questões no dia, fica 0.
-            evol['perc_acerto'] = (evol['acertos_num'] / evol['total_q_num'] * 100).fillna(0)
-            
-            fig_desempenho = px.line(
-                evol, x='data_str', y='perc_acerto', 
-                markers=True, color_discrete_sequence=['#ffffff'],
-                labels={'perc_acerto': '% Acertos'}
-            )
-            # Adiciona uma linha horizontal em 70% como meta de referência (opcional)
-            fig_desempenho.add_hline(y=70, line_dash="dash", line_color="#4f4f4f", annotation_text="Meta 70%")
-            
+            fig_desempenho = px.line(evol, x='data_label', y='perc_acerto', markers=True, text='perc_acerto', color_discrete_sequence=['#ffffff'])
+            fig_desempenho.update_traces(textposition="top center", texttemplate='%{text}%')
+            fig_desempenho.add_hline(y=90, line_dash="dash", line_color="#4f4f4f", annotation_text="Meta 90%")
             fig_desempenho.update_layout(
-                yaxis=dict(range=[0, 105], gridcolor='#4f4f4f'), 
-                xaxis=dict(gridcolor='#4f4f4f'),
+                yaxis=dict(range=[0, 105], gridcolor='#4f4f4f', title="% Acerto"), 
+                xaxis=dict(gridcolor='#4f4f4f', title="Data"),
                 paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='white'),
-                margin=dict(l=20, r=20, t=20, b=20)
+                margin=dict(l=20, r=20, t=30, b=20)
             )
-            st.plotly_chart(fig_desempenho, use_container_width=True)
+            # staticPlot: True torna o gráfico imóvel
+            st.plotly_chart(fig_desempenho, use_container_width=True, config={'staticPlot': True})
 
 elif page == "Registrar Estudo":
     st.title("🧮 Novo Registro")
