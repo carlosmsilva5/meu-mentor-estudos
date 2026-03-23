@@ -245,23 +245,30 @@ if page == "Home":
             
             evol = pd.merge(df_dias, est_agrup, left_on='data', right_on='data_fmt', how='left').fillna(0)
             evol['data_label'] = evol['data'].dt.strftime('%d/%m')
-            evol['horas_estudo'] = (evol['tempo_num'] / 60).round(1)
+            
+            # --- LÓGICA DE FORMATAÇÃO 00h00min ---
+            def formatar_para_grafico(minutos):
+                h = int(minutos // 60)
+                m = int(minutos % 60)
+                return f"{h:02d}h{m:02d}min"
+
+            evol['tempo_formatado'] = evol['tempo_num'].apply(formatar_para_grafico)
+            evol['horas_decimal'] = (evol['tempo_num'] / 60).round(2)
             evol['perc_acerto'] = (evol['acertos_num'] / evol['total_q_num'] * 100).fillna(0).round(1)
             
-            # 2. Gráfico 1: Horas Estudadas (Imóvel com Números Fixos)
+            # 2. Gráfico 1: Horas Estudadas (Texto Fixo Formatado)
             st.subheader("Evolução de Carga Horária (7 Dias)")
-            fig_horas = px.line(evol, x='data_label', y='horas_estudo', markers=True, text='horas_estudo', color_discrete_sequence=['#3ec6a8'])
-            fig_horas.update_traces(textposition="top center", texttemplate='%{text}h')
+            fig_horas = px.line(evol, x='data_label', y='horas_decimal', markers=True, text='tempo_formatado', color_discrete_sequence=['#3ec6a8'])
+            fig_horas.update_traces(textposition="top center")
             fig_horas.update_layout(
-                yaxis=dict(rangemode='tozero', gridcolor='#4f4f4f', title="Horas"), 
+                yaxis=dict(rangemode='tozero', gridcolor='#4f4f4f', title="Tempo"), 
                 xaxis=dict(gridcolor='#4f4f4f', title="Data"),
                 paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='white'),
                 margin=dict(l=20, r=20, t=30, b=20)
             )
-            # staticPlot: True torna o gráfico imóvel
             st.plotly_chart(fig_horas, use_container_width=True, config={'staticPlot': True})
 
-            # 3. Gráfico 2: Desempenho Geral (Imóvel com Números Fixos)
+            # 3. Gráfico 2: Desempenho Geral (Texto Fixo %)
             st.subheader("Desempenho Geral (7 Dias)")
             fig_desempenho = px.line(evol, x='data_label', y='perc_acerto', markers=True, text='perc_acerto', color_discrete_sequence=['#ffffff'])
             fig_desempenho.update_traces(textposition="top center", texttemplate='%{text}%')
@@ -272,7 +279,6 @@ if page == "Home":
                 paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='white'),
                 margin=dict(l=20, r=20, t=30, b=20)
             )
-            # staticPlot: True torna o gráfico imóvel
             st.plotly_chart(fig_desempenho, use_container_width=True, config={'staticPlot': True})
 
 elif page == "Registrar Estudo":
