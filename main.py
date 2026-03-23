@@ -155,55 +155,44 @@ if page == "Home":
 
     st.divider()
 
-    if not df_estudo.empty:
-        # Tratamento de dados numéricos
+  if not df_estudo.empty:
+        # 1. Garante que as colunas existem na memória do Pandas (mesmo que vazias na planilha)
+        for col_nova in ['paginas', 'humor', 'tipo_estudo']:
+            if col_nova not in df_estudo.columns:
+                df_estudo[col_nova] = 0 if col_nova == 'paginas' else "N/A"
+
+        # 2. Tratamento rigoroso de dados numéricos
         df_estudo['tempo_num'] = pd.to_numeric(df_estudo['tempo'], errors='coerce').fillna(0)
         df_estudo['acertos_num'] = pd.to_numeric(df_estudo['acertos'], errors='coerce').fillna(0)
         df_estudo['total_q_num'] = pd.to_numeric(df_estudo['total_q'], errors='coerce').fillna(0)
-        df_estudo['paginas_num'] = pd.to_numeric(df_estudo.get('paginas', 0), errors='coerce').fillna(0)
+        df_estudo['paginas_num'] = pd.to_numeric(df_estudo['paginas'], errors='coerce').fillna(0)
         
         col_grafico1, col_grafico2 = st.columns(2)
         
         with col_grafico1:
             st.subheader("Desempenho por Disciplina")
             
-            # Agrupamento Principal com Humor e Páginas
+            # Agrupamento Principal
             painel_disciplina = df_estudo.groupby("materia").agg(
                 tempo_total=("tempo_num", "sum"),
                 q_total=("total_q_num", "sum"),
                 q_acertos=("acertos_num", "sum"),
-                total_pag=("paginas_num", "sum"),
-                humor_pred=("humor", lambda x: x.mode()[0] if not x.mode().empty else "N/A")
+                total_pag=("paginas_num", "sum")
             ).reset_index()
+
+            # Adiciona Humor Predominante (Moda) com tratamento de erro
+            humor_map = df_estudo.groupby("materia")['humor'].agg(lambda x: x.mode()[0] if not x.mode().empty else "N/A").reset_index()
+            painel_disciplina = pd.merge(painel_disciplina, humor_map, on="materia", how="left")
             
             # Subdivisão de Tempo por Tipo (Teoria, Revisão, Questões)
-            # Pivotamos os dados para ter colunas por tipo de estudo
             df_tipos = df_estudo.groupby(["materia", "tipo_estudo"])["tempo_num"].sum().unstack(fill_value=0).reset_index()
-            # Garantir que as colunas existam mesmo que não haja registros
-            for col in ["Teoria Novo", "Revisão", "Questões"]:
-                if col not in df_tipos.columns: df_tipos[col] = 0
             
-            # Mesclamos o painel principal com a divisão de tempo
+            # Garante que as colunas de tipo existam para não quebrar a tabela
+            for t in ["Teoria Novo", "Revisão", "Questões"]:
+                if t not in df_tipos.columns: df_tipos[t] = 0
+            
+            # Mescla tudo no painel final
             painel_completo = pd.merge(painel_disciplina, df_tipos, on="materia", how="left")
-            
-            # Tabela de Detalhamento
-            st.markdown("#### Detalhamento das Matérias")
-            tab_view = painel_completo.copy()
-            tab_view["Tempo"] = tab_view["tempo_total"].apply(formatar_tempo)
-            tab_view["Aproveit."] = (tab_view["q_acertos"] / tab_view["q_total"] * 100).fillna(0).map("{:.1f}%".format)
-            
-            # Formatação do tempo subdividido para exibição
-            tab_view["Teoria"] = tab_view["Teoria Novo"].apply(formatar_tempo)
-            tab_view["Revisão"] = tab_view["Revisão"].apply(formatar_tempo)
-            tab_view["Questões"] = tab_view["Questões"].apply(formatar_tempo)
-
-            cols_show = ["materia", "Tempo", "Teoria", "Revisão", "Questões", "total_pag", "humor_pred", "Aproveit."]
-            st.dataframe(
-                tab_view[cols_show].rename(columns={
-                    "materia": "Matéria", "total_pag": "Págs", "humor_pred": "Humor"
-                }), 
-                use_container_width=True, hide_index=True
-            )
 
         with col_grafico2:
             st.subheader("Foco por Tipo de Estudo")
