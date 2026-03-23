@@ -357,56 +357,84 @@ elif page == "Registrar Estudo":
             st.success(f"Estudo salvo! {total_paginas} páginas contabilizadas.")
             st.rerun()
 
-elif page == "Caderno de Erros":
-    st.title("❌ Caderno de Erros Estratégico")
+elif page == "Ciclo de Estudos":
+    st.title("🎯 Planejamento do Ciclo")
     
-    # Lista de motivos de erro de alta performance
-    tipos_erro = ["Atenção / Bobeira", "Teoria não vista", "Erro de Interpretação", "Pegadinha", "Jurisprudência da Banca"]
+    # 1. Busca as disciplinas (Tenta a planilha, se falhar usa a sua lista padrão)
+    try:
+        df_materias_atu = conn.read(worksheet="materias")
+        lista_disciplinas_ciclo = df_materias_atu['materia'].dropna().unique().tolist()
+    except:
+        lista_disciplinas_ciclo = [
+            "Português", "Matemática e Raciocínio Lógico", "Informática", 
+            "Regimento Interno", "Dir. Constitucional", "Dir. Administrativo", 
+            "Contabilidade Geral", "Contabilidade Pública", 
+            "Administração Financeira Orçamentária", "Auditoria", "Estudo de Caso"
+        ]
+
+    if not lista_disciplinas_ciclo:
+        lista_disciplinas_ciclo = ["Nenhuma Disciplina Cadastrada"]
+
+    # 2. Configuração de Carga Semanal
+    st.markdown('<div class="giro-badge">🔄 Configuração de Carga Horária</div>', unsafe_allow_html=True)
+    horas_semana = st.number_input("Horas totais pretendidas na semana:", 5, 100, 20)
     
-    with st.form("form_erro", clear_on_submit=True):
-        m_e = st.selectbox("Matéria", materias_list)
-        tipo_e = st.selectbox("Motivo do Erro", tipos_erro) # NOVO CAMPO DE SELEÇÃO
-        link_e = st.text_input("Link ou Referência da Questão")
-        obs_e = st.text_area("Insight: O que você aprendeu com esse erro?")
-        
-        if st.form_submit_button("Registrar no Caderno"):
-            # Agora a variável 'tipo' recebe a sua escolha (tipo_e) em vez de ser fixa
-            novo_e = pd.DataFrame([{"data": datetime.now().strftime("%d/%m/%Y"), "materia": m_e, "tipo": tipo_e, "link": link_e, "comentario": obs_e}])
+    st.divider()
+
+    # --- 3. CARDS DINÂMICOS (Peso e Nível dentro do Card) ---
+    st.subheader("Distribuição da Carga Horária")
+    
+    cols = st.columns(3)
+    dados_para_calculo = []
+
+    for i, materia_nome in enumerate(lista_disciplinas_ciclo):
+        with cols[i % 3]:
+            # Card Visual
+            st.markdown(f"""
+                <div style="background: #3a3b3c; border: 1px solid #4f4f4f; padding: 10px; border-radius: 10px; text-align: center; border-top: 4px solid white;">
+                    <b style="color:white; font-size: 16px;">{materia_nome}</b>
+                </div>
+            """, unsafe_allow_html=True)
             
-            df_atual_e = conn.read(worksheet="caderno_erros").dropna(how='all')
-            # Garante que as colunas existam
-            if df_atual_e.empty:
-                df_atual_e = pd.DataFrame(columns=["data", "materia", "tipo", "link", "comentario"])
-                
-            conn.update(worksheet="caderno_erros", data=pd.concat([df_atual_e, novo_e], ignore_index=True))
-            st.cache_data.clear()
-            st.success(f"Erro de '{tipo_e}' catalogado com sucesso!")
-            st.rerun()
+            # Inputs lado a lado para economizar espaço
+            c1, c2 = st.columns(2)
+            with c1:
+                p = st.number_input("Peso", 1, 5, 3, key=f"p_ciclo_{materia_nome}")
+            with c2:
+                n = st.number_input("Nível", 1, 5, 3, key=f"n_ciclo_{materia_nome}")
+            
+            g = st.number_input("Giros", 1, 10, 1, key=f"g_ciclo_{materia_nome}")
+            
+            # Armazena para o cálculo
+            fator = p / n
+            dados_para_calculo.append({
+                "materia": materia_nome, 
+                "fator": fator, 
+                "peso": p, 
+                "nivel": n, 
+                "giros": g
+            })
+            st.write("") # Espaçador
+
+    # --- 4. CÁLCULO E EXIBIÇÃO DO TEMPO ---
+    df_c = pd.DataFrame(dados_para_calculo)
+    df_c["horas_calculadas"] = (df_c["fator"] / df_c["fator"].sum()) * horas_semana
+
+    st.success("✅ Carga horária calculada com sucesso!")
+    
+    # Mostra o tempo resultante abaixo de cada card
+    res_cols = st.columns(3)
+    for idx, row in df_c.iterrows():
+        with res_cols[idx % 3]:
+            tempo_fmt = decimal_para_horas(row["horas_calculadas"])
+            st.info(f"⏱️ **{row['materia']}**\n\nMeta: {tempo_fmt}")
 
     st.divider()
-    st.subheader("📚 Seus Erros Registrados")
     
-    if not df_erros.empty:
-        st.dataframe(
-            df_erros, 
-            use_container_width=True, 
-            hide_index=True,
-            column_config={
-                "data": "Data",
-                "materia": "Matéria",
-                "tipo": st.column_config.TextColumn("Motivo"), # Mostrando o motivo na tabela
-                "link": st.column_config.LinkColumn("Link da Questão"),
-                "comentario": st.column_config.TextColumn("Insight / Aprendizado")
-            }
-        )
-    else:
-        st.info("Você ainda não registrou nenhum erro no caderno. Bom trabalho (ou vá fazer mais questões!) 😉")
-    
-   
-NameError: This app has encountered an error. The original error message is redacted to prevent data leaks. Full error details have been recorded in the logs (if you're on Streamlit Cloud, click on 'Manage app' in the lower right of your app).
-Traceback:
-File "/mount/src/meu-mentor-estudos/main.py", line 454, in <module>
-    for i, materia_nome in enumerate(lista_disciplinas):
+    # 5. SALVAMENTO DO CICLO (OPCIONAL)
+    if st.button("Salvar Configuração do Ciclo", type="primary", use_container_width=True):
+        # Aqui você pode salvar o df_c em uma aba 'config_ciclo' se desejar
+        st.success("Configurações aplicadas para esta sessão!")
                                      
 
 elif page == "Gestão de Dados":
