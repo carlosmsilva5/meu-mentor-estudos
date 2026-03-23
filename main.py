@@ -252,9 +252,8 @@ if page == "Home":
                 if h > 0: return f"{h}h"
                 return f"{m}min"
                 
-            evol = pd.merge(df_dias, est_agrup, left_on='data', right_on='data_fmt', how='left').fillna(0)
-            evol['data_label'] = evol['data'].dt.strftime('%d/%m')
-            evol['horas_estudo'] = (evol['tempo_num'] / 60).round(1)
+            evol['tempo_texto'] = evol['tempo_num'].apply(formatar_grafico)
+            evol['horas_decimal'] = (evol['tempo_num'] / 60).round(1)
             evol['perc_acerto'] = (evol['acertos_num'] / evol['total_q_num'] * 100).fillna(0).round(1)
             
             # 2. Gráfico 1: Horas Estudadas (Imóvel com Números Fixos)
