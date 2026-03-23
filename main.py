@@ -140,6 +140,7 @@ with st.sidebar:
 if page == "Home":
     st.title("Visão Geral")
     
+    # 1. Cálculos de Topo
     t_min = pd.to_numeric(df_estudo['tempo'], errors='coerce').sum() if not df_estudo.empty else 0
     q_tot = pd.to_numeric(df_estudo['total_q'], errors='coerce').sum() if not df_estudo.empty else 0
     q_acc = pd.to_numeric(df_estudo['acertos'], errors='coerce').sum() if not df_estudo.empty else 0
@@ -155,100 +156,67 @@ if page == "Home":
     st.divider()
 
     if not df_estudo.empty:
-        # Garantindo que os valores são números
+        # 2. Tratamento e Criação de Colunas (Evita o erro anterior)
+        for col in ['paginas', 'humor', 'tipo_estudo']:
+            if col not in df_estudo.columns:
+                df_estudo[col] = 0 if col == 'paginas' else "N/A"
+
         df_estudo['tempo_num'] = pd.to_numeric(df_estudo['tempo'], errors='coerce').fillna(0)
         df_estudo['acertos_num'] = pd.to_numeric(df_estudo['acertos'], errors='coerce').fillna(0)
         df_estudo['total_q_num'] = pd.to_numeric(df_estudo['total_q'], errors='coerce').fillna(0)
+        df_estudo['paginas_num'] = pd.to_numeric(df_estudo['paginas'], errors='coerce').fillna(0)
         
         col_grafico1, col_grafico2 = st.columns(2)
         
         with col_grafico1:
             st.subheader("Desempenho por Disciplina")
-            painel_disciplina = df_estudo.groupby("materia").agg(
+            
+            # Agrupamento Principal
+            painel_disc = df_estudo.groupby("materia").agg(
                 tempo_total=("tempo_num", "sum"),
                 q_total=("total_q_num", "sum"),
-                q_acertos=("acertos_num", "sum")
+                q_acertos=("acertos_num", "sum"),
+                total_pag=("paginas_num", "sum")
             ).reset_index()
+
+            # Humor Predominante
+            humor_map = df_estudo.groupby("materia")['humor'].agg(lambda x: x.mode()[0] if not x.mode().empty else "N/A").reset_index()
+            painel_disc = pd.merge(painel_disc, humor_map, on="materia", how="left")
             
-            painel_disciplina["aproveitamento"] = (painel_disciplina["q_acertos"] / painel_disciplina["q_total"] * 100).fillna(0)
+            # Divisão de Tempo por Tipo (Teoria, Revisão, Questões)
+            df_tipos = df_estudo.groupby(["materia", "tipo_estudo"])["tempo_num"].sum().unstack(fill_value=0).reset_index()
+            for t in ["Teoria Novo", "Revisão", "Questões"]:
+                if t not in df_tipos.columns: df_tipos[t] = 0
             
-            fig_radar = px.line_polar(
-                painel_disciplina, 
-                r='aproveitamento', 
-                theta='materia', 
-                line_close=True,
-                markers=True,
-                color_discrete_sequence=['white']
-            )
-            fig_radar.update_traces(fill='toself')
-            fig_radar.update_layout(
-                polar=dict(
-                    bgcolor='rgba(0,0,0,0)', 
-                    radialaxis=dict(visible=True, range=[0, 100], color='white', gridcolor='#4f4f4f'),
-                    angularaxis=dict(color='white', gridcolor='#4f4f4f')
-                ),
-                paper_bgcolor='rgba(0,0,0,0)', 
-                plot_bgcolor='rgba(0,0,0,0)', 
-                font=dict(color='white'),
-                margin=dict(l=40, r=40, t=20, b=20)
-            )
-            st.plotly_chart(fig_radar, use_container_width=True, config={'staticPlot': True})
+            painel_completo = pd.merge(painel_disc, df_tipos, on="materia", how="left")
             
-            st.markdown("#### Detalhamento das Matérias")
-            tabela_exibicao = painel_disciplina.copy()
-            tabela_exibicao["Tempo Gasto"] = tabela_exibicao["tempo_total"].apply(formatar_tempo)
-            tabela_exibicao["Desempenho"] = tabela_exibicao["aproveitamento"].map("{:.1f}%".format)
-            tabela_exibicao.rename(columns={"materia": "Matéria", "q_total": "Questões"}, inplace=True)
-            
+            # Formatação da Tabela
+            tab_v = painel_completo.copy()
+            tab_v["Total"] = tab_v["tempo_total"].apply(formatar_tempo)
+            tab_v["Teoria"] = tab_v["Teoria Novo"].apply(formatar_tempo)
+            tab_v["Rev."] = tab_v["Revisão"].apply(formatar_tempo)
+            tab_v["Ques."] = tab_v["Questões"].apply(formatar_tempo)
+            tab_v["Aprov."] = (tab_v["q_acertos"] / tab_v["q_total"] * 100).fillna(0).map("{:.1f}%".format)
+
+            cols_final = ["materia", "Total", "Teoria", "Rev.", "Ques.", "total_pag", "humor", "Aprov."]
             st.dataframe(
-                tabela_exibicao[["Matéria", "Tempo Gasto", "Desempenho", "Questões"]], 
-                use_container_width=True, 
-                hide_index=True
+                tab_v[cols_final].rename(columns={"materia": "Matéria", "total_pag": "Págs", "humor": "Humor"}), 
+                use_container_width=True, hide_index=True
             )
 
         with col_grafico2:
-            st.subheader("Evolução (Últimos 7 Dias)")
-            
-            # 1. Cria uma linha do tempo contínua dos últimos 7 dias (Hoje + 6 dias anteriores)
+            st.subheader("Evolução (7 Dias)")
+            # Lógica de evolução simplificada
             hoje = pd.Timestamp.today().normalize()
-            ultimos_7_dias = pd.date_range(end=hoje, periods=7)
-            df_dias = pd.DataFrame({'data_fmt': ultimos_7_dias})
-            
-            # 2. Formata a data e agrupa o que foi estudado de verdade
+            df_dias = pd.DataFrame({'data_fmt': pd.date_range(end=hoje, periods=7)})
             df_estudo['data_fmt'] = pd.to_datetime(df_estudo['data'], format='%d/%m/%Y', errors='coerce')
-            estudo_agrupado = df_estudo.groupby('data_fmt')["tempo_num"].sum().reset_index()
+            est_agrup = df_estudo.groupby('data_fmt')["tempo_num"].sum().reset_index()
+            evol = pd.merge(df_dias, est_agrup, on='data_fmt', how='left').fillna(0)
+            evol['data_str'] = evol['data_fmt'].dt.strftime('%d/%m')
             
-            # 3. Mescla o calendário com os estudos (dias sem estudo recebem 0)
-            evolucao = pd.merge(df_dias, estudo_agrupado, on='data_fmt', how='left').fillna(0)
-            evolucao['data_str'] = evolucao['data_fmt'].dt.strftime('%d/%m')
-            
-            # 4. Converte e formata os textos
-            evolucao['horas_estudo'] = (evolucao['tempo_num'] / 60).round(1)
-            evolucao['texto_tempo'] = evolucao['tempo_num'].apply(formatar_tempo)
-            
-            # 5. Plota o gráfico
-            fig_line = px.line(
-                evolucao, 
-                x='data_str', 
-                y='horas_estudo', 
-                text='texto_tempo', 
-                markers=True, 
-                labels={'horas_estudo': 'Horas', 'data_str': 'Data'}, 
-                color_discrete_sequence=['white']
-            )
-            
-            # 6. Ajusta o visual para a linha ancorar no eixo X (Zero)
-            fig_line.update_traces(textposition="top center") 
-            fig_line.update_layout(
-                yaxis=dict(rangemode='tozero', showgrid=True, gridcolor='#4f4f4f'), # <--- Força começar do Zero
-                xaxis=dict(showgrid=False),
-                paper_bgcolor='rgba(0,0,0,0)', 
-                plot_bgcolor='rgba(0,0,0,0)', 
-                font=dict(color='white'),
-                margin=dict(l=20, r=20, t=20, b=20)
-            )
-            
-            st.plotly_chart(fig_line, use_container_width=True, config={'staticPlot': True})
+            fig_line = px.line(evol, x='data_str', y=(evol['tempo_num']/60).round(1), markers=True, color_discrete_sequence=['#3ec6a8'])
+            fig_line.update_layout(yaxis=dict(rangemode='tozero', title="Horas"), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='white'))
+            st.plotly_chart(fig_line, use_container_width=True)
 
 elif page == "Registrar Estudo":
     st.title("🧮 Novo Registro")
