@@ -411,57 +411,71 @@ elif page == "Ciclo de Estudos":
     
     # 2. Carga Horária Semanal
     horas_semana = st.number_input("Horas totais pretendidas na semana:", 5, 100, 25)
+    st.caption("Marque as disciplinas que entrarão neste ciclo. As desmarcadas não receberão carga horária.")
 
     st.write("---")
 
-    # --- 3. LÓGICA DE CÁLCULO (Passo 1: Coletar valores atuais) ---
-    fatores = []
-    for m in materias_list:
-        # Busca o valor atual do slider no session_state ou usa o padrão 3
-        p_val = st.session_state.get(f"p_ciclo_{m}", 3)
-        n_val = st.session_state.get(f"n_ciclo_{m}", 3)
-        fatores.append(p_val / n_val)
+    # --- 3. LÓGICA DE CÁLCULO (Passo 1: Identificar Matérias Ativas) ---
+    materias_ativas = []
+    fatores_ativos = []
     
-    soma_fatores = sum(fatores) if sum(fatores) > 0 else 1
+    # Primeiro loop rápido apenas para coletar quem está marcado
+    for m in materias_list:
+        is_active = st.session_state.get(f"check_{m}", True)
+        if is_active:
+            p_val = st.session_state.get(f"p_ciclo_{m}", 3)
+            n_val = st.session_state.get(f"n_ciclo_{m}", 3)
+            materias_ativas.append(m)
+            fatores_ativos.append(p_val / n_val)
+    
+    soma_fatores = sum(fatores_ativos) if fatores_ativos else 1
 
-    # --- 4. RENDERIZAÇÃO DOS CARDS E CONTROLES (Conforme a Imagem) ---
+    # --- 4. RENDERIZAÇÃO DOS CARDS E CONTROLES ---
     cols = st.columns(3)
-    metas_calculadas = {} 
+    metas_calculadas_horas = {} 
 
     for i, m in enumerate(materias_list):
         with cols[i % 3]:
-            # A) Cálculo do tempo antes de desenhar o card
+            # CHECKBOX DE ATIVAÇÃO
+            ativo = st.checkbox(f"Incluir {m}", value=True, key=f"check_{m}")
+            
             p_atual = st.session_state.get(f"p_ciclo_{m}", 3)
             n_atual = st.session_state.get(f"n_ciclo_{m}", 3)
-            horas_materia = ((p_atual / n_atual) / soma_fatores) * horas_semana
-            minutos_materia = int(horas_materia * 60)
-            metas_calculadas[m] = minutos_materia
+            
+            # Se a matéria estiver ativa, calcula a hora. Se não, é zero.
+            if ativo:
+                horas_materia = ((p_atual / n_atual) / soma_fatores) * horas_semana
+            else:
+                horas_materia = 0.0
+            
+            metas_calculadas_horas[m] = round(horas_materia, 2)
 
-            # B) CARD DE RESULTADO (No topo do bloco)
+            # CARD DE RESULTADO (Cor muda se estiver inativo)
+            bg_card = "#3a3b3c" if ativo else "#202225"
+            border_card = "#3ec6a8" if ativo else "#4f4f4f"
+            opacity = "1" if ativo else "0.3"
+
             st.markdown(f"""
-                <div style="background:#3a3b3c; padding:15px; border-radius:10px; border-top:4px solid #3ec6a8; text-align:center; margin-bottom:10px;">
+                <div style="background:{bg_card}; padding:15px; border-radius:10px; border-top:4px solid {border_card}; text-align:center; margin-bottom:10px; opacity:{opacity};">
                     <b style="color:#b0b3b8; font-size:12px; text-transform:uppercase;">{m}</b><br>
                     <span style="color:white; font-size:24px; font-weight:bold;">{decimal_para_horas(horas_materia)}</span><br>
-                    <small style="color:#3ec6a8;">Carga Horária Sugerida</small>
+                    <small style="color:{border_card};">{"Meta Semanal" if ativo else "Fora do Ciclo"}</small>
                 </div>
             """, unsafe_allow_html=True)
 
-            # C) CONTROLES DE AJUSTE (Logo abaixo do card)
-            st.select_slider("Peso", [1,2,3,4,5], 3, key=f"p_ciclo_{m}")
-            st.select_slider("Nível", [1,2,3,4,5], 3, key=f"n_ciclo_{m}")
-            st.write("") # Espaçador
+            # CONTROLES (Desabilitam visualmente se inativo, mas o Streamlit mantém o valor)
+            st.select_slider("Peso", [1,2,3,4,5], 3, key=f"p_ciclo_{m}", disabled=not ativo)
+            st.select_slider("Nível", [1,2,3,4,5], 3, key=f"n_ciclo_{m}", disabled=not ativo)
+            st.write("") 
 
     st.divider()
 
     # --- 5. CRONOGRAMA DE EXECUÇÃO ---
     st.subheader("🗓️ Cronograma de Execução (Fila de Estudos)")
     
-    # CORREÇÃO DO BOTÃO DE DISTRIBUIÇÃO
-    if st.button("🪄 Distribuir Tempos Calculados", use_container_width=True):
-        # Trabalhamos com uma cópia para garantir a reatividade
+    if st.button("🪄 Distribuir Horas Calculadas", use_container_width=True):
         df_temp = df_cronograma.copy()
         
-        # Mapeamos quantas vezes cada matéria aparece na planilha inteira
         aparicoes = {}
         for col in ["disciplina 01", "disciplina 02", "disciplina 03"]:
             if col in df_temp.columns:
@@ -469,34 +483,30 @@ elif page == "Ciclo de Estudos":
                 for mat, count in counts.items():
                     aparicoes[mat] = aparicoes.get(mat, 0) + count
 
-        # Distribuímos o tempo total calculado entre as aparições
         for idx, row in df_temp.iterrows():
             for i in range(1, 4):
                 col_m = f"disciplina 0{i}"
-                col_t = f"tempo d{i} (min)"
-                if col_m in df_temp.columns and col_t in df_temp.columns:
+                col_h = f"tempo d{i} (h)"
+                if col_m in df_temp.columns:
                     m_nome = row[col_m]
-                    if m_nome in metas_calculadas:
-                        total_min = metas_calculadas[m_nome]
-                        n_vezes = aparicoes.get(m_nome, 1)
-                        df_temp.at[idx, col_t] = int(total_min / n_vezes)
+                    total_h = metas_calculadas_horas.get(m_nome, 0)
+                    n_vezes = aparicoes.get(m_nome, 1)
+                    df_temp.at[idx, col_h] = round(total_h / n_vezes, 2)
         
-        # Salva o resultado no banco e limpa cache para atualizar a tela
         overwrite_data("cronograma", df_temp)
-        st.success("Tempos distribuídos conforme sua meta! Clique em 'Salvar e Aplicar' para confirmar.")
+        st.success("Carga horária redistribuída apenas entre as matérias ativas!")
         st.rerun()
 
-    # Configuração da tabela (Data Editor)
     config_crono = {
         "ordem": st.column_config.TextColumn("Sequência", disabled=True),
         "disciplina 01": st.column_config.SelectboxColumn("Matéria 01", options=materias_list),
-        "tempo d1 (min)": st.column_config.NumberColumn("Min. D1"),
+        "tempo d1 (h)": st.column_config.NumberColumn("Horas D1", format="%.2f h"),
         "giros": st.column_config.NumberColumn("🌀 Giro", min_value=1),
         "disciplina 02": st.column_config.SelectboxColumn("Matéria 02", options=materias_list),
-        "tempo d2 (min)": st.column_config.NumberColumn("Min. D2"),
+        "tempo d2 (h)": st.column_config.NumberColumn("Horas D2", format="%.2f h"),
         "disciplina 03": st.column_config.SelectboxColumn("Matéria 03", options=materias_list),
-        "tempo d3 (min)": st.column_config.NumberColumn("Min. D3"),
-        "total dia (min)": st.column_config.NumberColumn("Soma Total", disabled=True)
+        "tempo d3 (h)": st.column_config.NumberColumn("Horas D3", format="%.2f h"),
+        "total dia (h)": st.column_config.NumberColumn("Total Dia", format="%.2f h", disabled=True)
     }
 
     ed_ciclo = st.data_editor(
@@ -505,18 +515,22 @@ elif page == "Ciclo de Estudos":
         use_container_width=True,
         hide_index=True,
         column_config=config_crono,
-        key="editor_ciclo_vinal"
+        key="editor_ciclo_final_com_filtro"
     )
 
     if st.button("💾 Salvar e Aplicar Ciclo", type="primary", use_container_width=True):
-        ed_ciclo["total dia (min)"] = (
-            ed_ciclo["tempo d1 (min)"].fillna(0) + 
-            ed_ciclo["tempo d2 (min)"].fillna(0) + 
-            ed_ciclo["tempo d3 (min)"].fillna(0)
+        ed_ciclo["total dia (h)"] = (
+            ed_ciclo["tempo d1 (h)"].fillna(0) + 
+            ed_ciclo["tempo d2 (h)"].fillna(0) + 
+            ed_ciclo["tempo d3 (h)"].fillna(0)
         )
+        # Salva em minutos para compatibilidade
+        for i in range(1, 4):
+            ed_ciclo[f"tempo d{i} (min)"] = (ed_ciclo[f"tempo d{i} (h)"] * 60).astype(int)
+        
         overwrite_data("cronograma", ed_ciclo)
-        st.success("✅ Ciclo gravado com sucesso!")
-        st.balloons()
+        st.success("✅ Ciclo atualizado e salvo!")
+        st.rerun()
 
 elif page == "Gestão de Dados":
     st.title("⚙️ Painel de Controle")
