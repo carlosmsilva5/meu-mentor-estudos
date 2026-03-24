@@ -166,7 +166,7 @@ if page == "Home":
     st.divider()
 
     if not df_estudo.empty:
-        # --- BLOCO SUPERIOR: RADAR E EVOLUÇÃO ---
+        # --- BLOCO SUPERIOR: RADAR E EVOLUÇÕES ---
         col_grafico1, col_grafico2 = st.columns(2)
         
         with col_grafico1:
@@ -201,7 +201,7 @@ if page == "Home":
             st.plotly_chart(fig_radar, use_container_width=True)
 
         with col_grafico2:
-            st.subheader("Evolução de Carga Horária")
+            # Preparação dos dados de 7 dias
             hoje = pd.Timestamp.today().normalize()
             df_dias = pd.DataFrame({'data': pd.date_range(end=hoje, periods=7)})
             df_estudo['data_fmt'] = pd.to_datetime(df_estudo['data'], format='%d/%m/%Y', errors='coerce')
@@ -210,21 +210,32 @@ if page == "Home":
             evol = pd.merge(df_dias, est_agrup, left_on='data', right_on='data_fmt', how='left').fillna(0)
             evol['data_label'] = evol['data'].dt.strftime('%d/%m')
             
-            # LÓGICA SOLICITADA: Ocultar número se for 0
+            # Lógica de Rótulos: Ocultar se for 0
             evol['texto_tempo'] = evol['tempo_num'].apply(lambda x: f"{int(x//60)}h{int(x%60)}m" if x > 0 else "")
             evol['texto_aprov'] = evol.apply(lambda x: f"{int(x['acertos_num']/x['total_q_num']*100)}%" if x['total_q_num'] > 0 else "", axis=1)
-            
             evol['horas_decimal'] = (evol['tempo_num'] / 60).round(2)
-            
-            fig_evol = px.line(evol, x='data_label', y='horas_decimal', markers=True, text='texto_tempo', color_discrete_sequence=['#3ec6a8'])
-            fig_evol.update_traces(textposition="top center")
-            fig_evol.update_layout(
-                yaxis=dict(rangemode='tozero', gridcolor='#4f4f4f', title="Horas"),
-                xaxis=dict(gridcolor='#4f4f4f', title=""),
-                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='white'),
-                margin=dict(l=20, r=20, t=30, b=20)
+            evol['perc_acerto'] = (evol['acertos_num'] / evol['total_q_num'] * 100).fillna(0).round(1)
+
+            # GRÁFICO 1: EVOLUÇÃO DE CARGA HORÁRIA
+            st.subheader("Evolução de Carga Horária")
+            fig_horas = px.line(evol, x='data_label', y='horas_decimal', markers=True, text='texto_tempo', color_discrete_sequence=['#3ec6a8'])
+            fig_horas.update_traces(textposition="top center")
+            fig_horas.update_layout(
+                yaxis=dict(rangemode='tozero', gridcolor='#4f4f4f', title="Horas"), xaxis=dict(gridcolor='#4f4f4f', title=""),
+                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='white'), height=250, margin=dict(l=20, r=20, t=30, b=20)
             )
-            st.plotly_chart(fig_evol, use_container_width=True)
+            st.plotly_chart(fig_horas, use_container_width=True)
+
+            # GRÁFICO 2: TAXA DE ACERTOS
+            st.subheader("Desempenho Geral (7 Dias)")
+            fig_aprov = px.line(evol, x='data_label', y='perc_acerto', markers=True, text='texto_aprov', color_discrete_sequence=['#ffffff'])
+            fig_aprov.update_traces(textposition="top center")
+            fig_aprov.add_hline(y=90, line_dash="dash", line_color="#4f4f4f", annotation_text="Meta 90%")
+            fig_aprov.update_layout(
+                yaxis=dict(range=[0, 105], gridcolor='#4f4f4f', title="% Acerto"), xaxis=dict(gridcolor='#4f4f4f', title=""),
+                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='white'), height=250, margin=dict(l=20, r=20, t=30, b=20)
+            )
+            st.plotly_chart(fig_aprov, use_container_width=True)
 
         # --- BLOCO INFERIOR: TABELA FULL WIDTH ---
         st.divider()
