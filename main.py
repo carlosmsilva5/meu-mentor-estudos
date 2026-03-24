@@ -128,7 +128,7 @@ with st.sidebar:
     st.title("📘 Mentor Elite")
     menu_map = {
         "🏠 Dashboard": "Home",
-        "⏱️ Registrar Pomodoro": "Registrar Estudo",
+        "⏱️ Registrar": "Registrar Estudo",
         "❌ Caderno de Erros": "Caderno de Erros",
         "🎯 Ciclo de Estudos": "Ciclo de Estudos",
         "⚙️ Gestão de Dados": "Gestão de Dados"
