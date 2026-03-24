@@ -546,38 +546,52 @@ elif page == "Gestão de Dados":
     with t2:
         st.markdown("### 📚 Gerenciar Disciplinas")
         
-        # 1. Tenta ler a aba, se der erro, cria um DataFrame vazio com a coluna certa
+        # 1. Tenta ler a aba 'materias'
         try:
-            df_materias_gestao = conn.read(worksheet="materias").dropna(how='all')
-            if 'materia' not in df_materias_gestao.columns:
+            df_raw = conn.read(worksheet="materias")
+            
+            # Limpeza de segurança: remove linhas vazias e garante nomes de colunas limpos
+            if df_raw is not None and not df_raw.empty:
+                df_materias_gestao = df_raw.dropna(how='all')
+                # Força o nome da coluna para 'materia' caso venha diferente
+                df_materias_gestao.columns = [str(c).strip().lower() for c in df_materias_gestao.columns]
+                
+                if 'materia' not in df_materias_gestao.columns:
+                    df_materias_gestao = pd.DataFrame(columns=["materia"])
+            else:
                 df_materias_gestao = pd.DataFrame(columns=["materia"])
+                
         except Exception:
-            # Se a aba não existir no Sheets, mostra o aviso amigável
-            st.warning("⚠️ A aba 'materias' não foi encontrada no seu Google Sheets. Por favor, crie uma aba chamada 'materias' com o cabeçalho 'materia' na célula A1.")
+            # Caso a aba não exista ou falhe a leitura
             df_materias_gestao = pd.DataFrame(columns=["materia"])
 
-        # 2. O Editor de Tabela
-        st.info("Clique na última linha para adicionar ou selecione uma linha e aperte 'Delete' para excluir.")
+        st.info("Adicione disciplinas na última linha ou edite as existentes.")
+        
+        # 2. O Editor de Tabela (Com proteção de tipo)
+        # Se o DF estiver vazio, adicionamos uma linha em branco para o Streamlit entender o tipo 'texto'
+        if df_materias_gestao.empty:
+            df_materias_gestao = pd.DataFrame([{"materia": ""}])
+
         ed_materias = st.data_editor(
             df_materias_gestao, 
             num_rows="dynamic", 
-            key="editor_final_materias", 
+            key="editor_safe_materias", 
             use_container_width=True,
-            hide_index=True,
-            column_config={
-                "materia": st.column_config.TextColumn("Nome da Disciplina", required=True)
-            }
+            hide_index=True
         )
 
         # 3. Botão Salvar
         if st.button("💾 Salvar Alterações", type="primary"):
             try:
+                # Remove linhas onde a matéria ficou vazia antes de salvar
+                df_para_salvar = ed_materias[ed_materias['materia'].str.strip() != ""]
+                
                 st.cache_data.clear()
-                overwrite_data("materias", ed_materias)
-                st.success("Disciplinas atualizadas! Agora elas aparecerão no Ciclo e no Registro.")
+                overwrite_data("materias", df_para_salvar)
+                st.success("Disciplinas atualizadas!")
                 st.rerun()
             except Exception as e:
-                st.error(f"Erro ao salvar: Verifique se a aba 'materias' existe no Sheets. Detalhe: {e}")
+                st.error(f"Erro ao salvar: {e}")
             
     with t3:
         st.markdown("### Editar Histórico de Sessões")
