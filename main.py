@@ -509,14 +509,14 @@ elif page == "Ciclo de Estudos":
     st.write("---")
     st.subheader("🖼️ Visualização do Cronograma Salvo")
     
-    # Criando a tabela HTML personalizada
+    # Criando a tabela HTML personalizada com tratamento de dados
     html_tabela = """
-    <table style="width:100%; border-collapse: collapse; background-color: #3a3b3c; color: white; border-radius: 10px; overflow: hidden;">
+    <table style="width:100%; border-collapse: collapse; background-color: #3a3b3c; color: white; border-radius: 10px; overflow: hidden; border: 1px solid #4f4f4f;">
         <thead>
             <tr style="background-color: #202225; color: #3ec6a8; text-align: left;">
                 <th style="padding: 12px; border: 1px solid #4f4f4f;">Sequência</th>
                 <th style="padding: 12px; border: 1px solid #4f4f4f;">Matéria 01</th>
-                <th style="padding: 12px; border: 1px solid #4f4f4f;">🌀 Giro</th>
+                <th style="padding: 12px; border: 1px solid #4f4f4f; text-align: center;">🌀 Giro</th>
                 <th style="padding: 12px; border: 1px solid #4f4f4f;">Matéria 02</th>
                 <th style="padding: 12px; border: 1px solid #4f4f4f;">Matéria 03</th>
                 <th style="padding: 12px; border: 1px solid #4f4f4f; background-color: #2b2d2e;">Total Dia</th>
@@ -526,22 +526,35 @@ elif page == "Ciclo de Estudos":
     """
     
     for _, row in df_cronograma.iterrows():
-        total_fmt = f"{row.get('total dia (h)', 0):.2f}h"
+        # Tratamento de valores nulos ou vazios para as disciplinas
+        m1 = row.get('disciplina 01', '-')
+        m2 = row.get('disciplina 02', '-')
+        m3 = row.get('disciplina 03', '-')
+        
+        # Tratamento para não exibir "nan" e sim "-"
+        m1 = m1 if pd.notna(m1) and m1 != "nan" else "-"
+        m2 = m2 if pd.notna(m2) and m2 != "nan" else "-"
+        m3 = m3 if pd.notna(m3) and m3 != "nan" else "-"
+
+        # Formatação dos tempos (se for 0 ou nulo, mostra vazio ou 0.00)
+        t1 = f"{row.get('tempo d1 (h)', 0):.2f}h" if m1 != "-" else ""
+        t2 = f"{row.get('tempo d2 (h)', 0):.2f}h" if m2 != "-" else ""
+        t3 = f"{row.get('tempo d3 (h)', 0):.2f}h" if m3 != "-" else ""
+        total_dia = f"{row.get('total dia (h)', 0):.2f}h"
+
         html_tabela += f"""
             <tr style="border-bottom: 1px solid #4f4f4f;">
-                <td style="padding: 10px; border: 1px solid #4f4f4f; font-weight: bold; background: #2b2d2e;">{row['ordem']}</td>
-                <td style="padding: 10px; border: 1px solid #4f4f4f;">{row['disciplina 01']} <br><small style='color:#3ec6a8'>{row.get('tempo d1 (h)',0)}h</small></td>
-                <td style="padding: 10px; border: 1px solid #4f4f4f; text-align:center;">{row['giros']}</td>
-                <td style="padding: 10px; border: 1px solid #4f4f4f;">{row['disciplina 02']} <br><small style='color:#3ec6a8'>{row.get('tempo d2 (h)',0)}h</small></td>
-                <td style="padding: 10px; border: 1px solid #4f4f4f;">{row['disciplina 03']} <br><small style='color:#3ec6a8'>{row.get('tempo d3 (h)',0)}h</small></td>
-                <td style="padding: 10px; border: 1px solid #4f4f4f; font-weight:bold; color:#3ec6a8; background: #2b2d2e;">{total_fmt}</td>
+                <td style="padding: 10px; border: 1px solid #4f4f4f; font-weight: bold; background: #2b2d2e; text-align: center;">{row['ordem']}</td>
+                <td style="padding: 10px; border: 1px solid #4f4f4f;">{m1} <br><small style='color:#3ec6a8'>{t1}</small></td>
+                <td style="padding: 10px; border: 1px solid #4f4f4f; text-align: center;">{int(row.get('giros', 1))}</td>
+                <td style="padding: 10px; border: 1px solid #4f4f4f;">{m2} <br><small style='color:#3ec6a8'>{t2}</small></td>
+                <td style="padding: 10px; border: 1px solid #4f4f4f;">{m3} <br><small style='color:#3ec6a8'>{t3}</small></td>
+                <td style="padding: 10px; border: 1px solid #4f4f4f; font-weight: bold; color: #3ec6a8; background: #2b2d2e; text-align: center;">{total_dia}</td>
             </tr>
         """
     
     html_tabela += "</tbody></table>"
     st.markdown(html_tabela, unsafe_allow_html=True)
-    
-    st.info("💡 Esta tabela reflete exatamente o que está salvo na sua planilha.")
 
 elif page == "Gestão de Dados":
     st.title("⚙️ Painel de Controle")
