@@ -524,23 +524,66 @@ elif page == "Gestão de Dados":
     t1, t2, t3, t4 = st.tabs(["🗓️ Editar Cronograma", "📚 Matérias", "📝 Histórico", "❌ Erros"])
     
     with t1:
-        st.markdown("### 🗓️ Personalize sua semana de estudos")
-        st.info("As alterações feitas aqui aparecerão na aba 'Ciclo de Estudos'.")
+        st.markdown("### 🗓️ Configuração do Ciclo de 7 Dias")
+        st.info("Defina as metas para cada dia do seu ciclo (01 a 07). As alterações refletem no cálculo do 'Ciclo de Estudos'.")
         
-        # Se o cronograma estiver vazio, cria um modelo inicial
-        if df_cronograma.empty:
-            df_cronograma = pd.DataFrame([
-                {"Dia": "Segunda", "Materia 1": "-", "Tempo (min)": 60, "Materia 2": "-", "Tempo 2 (min)": 60},
-                {"Dia": "Terça", "Materia 1": "-", "Tempo (min)": 60, "Materia 2": "-", "Tempo 2 (min)": 60}
-            ])
+        # 1. ESTRUTURA SEQUENCIAL (Dia 01 ao 07)
+        dias_ciclo = [f"Dia {i:02d}" for i in range(1, 8)]
+        
+        # Se a planilha estiver vazia ou com estrutura antiga, reinicia com as novas colunas
+        if df_cronograma.empty or "Disciplina 01" not in df_cronograma.columns:
+            df_cronograma = pd.DataFrame({
+                "Ordem": dias_ciclo,
+                "Disciplina 01": ["-"] * 7,
+                "Tempo D1 (min)": [60] * 7,
+                "Giros": [1] * 7, # Giro posicionado no meio
+                "Disciplina 02": ["-"] * 7,
+                "Tempo D2 (min)": [60] * 7,
+                "Disciplina 03": ["-"] * 7, # Terceira disciplina opcional
+                "Tempo D3 (min)": [0] * 7,
+                "Total Dia (min)": [120] * 7
+            })
 
-        ed_crono = st.data_editor(df_cronograma, num_rows="dynamic", key="ed_crono", use_container_width=True, hide_index=True)
+        # 2. CONFIGURAÇÃO VISUAL DAS COLUNAS
+        # Usamos os nomes das matérias que você já cadastrou para o seletor
+        config_colunas = {
+            "Ordem": st.column_config.TextColumn("Sequência", disabled=True),
+            "Disciplina 01": st.column_config.SelectboxColumn("Materia 01", options=materias_list, width="medium"),
+            "Tempo D1 (min)": st.column_config.NumberColumn("Minutos D1", min_value=0, step=5),
+            "Giros": st.column_config.NumberColumn("🌀 Giro", min_value=1, max_value=10, help="Número de giros no ciclo"),
+            "Disciplina 02": st.column_config.SelectboxColumn("Materia 02", options=materias_list, width="medium"),
+            "Tempo D2 (min)": st.column_config.NumberColumn("Minutos D2", min_value=0, step=5),
+            "Disciplina 03": st.column_config.SelectboxColumn("Materia 03", options=materias_list, width="medium"),
+            "Tempo D3 (min)": st.column_config.NumberColumn("Minutos D3", min_value=0, step=5),
+            "Total Dia (min)": st.column_config.NumberColumn("Soma Total", disabled=True)
+        }
+
+        # 3. EDITOR DE TABELA
+        ed_crono = st.data_editor(
+            df_cronograma, 
+            num_rows="fixed", # Mantém sempre os 7 dias
+            key="ed_crono_ciclico", 
+            use_container_width=True, 
+            hide_index=True,
+            column_config=config_colunas
+        )
         
-        if st.button("Salvar Cronograma", type="primary"):
-            # O comando abaixo limpa o cache ANTES de salvar para garantir a atualização
-            st.cache_data.clear()
+        # 4. SALVAMENTO E CÁLCULO
+        if st.button("Salvar Planejamento de 7 Dias", type="primary", use_container_width=True):
+            # Calcula o total de minutos do dia somando as 3 colunas de tempo
+            ed_crono["Total Dia (min)"] = (
+                ed_crono["Tempo D1 (min)"].fillna(0) + 
+                ed_crono["Tempo D2 (min)"].fillna(0) + 
+                ed_crono["Tempo D3 (min)"].fillna(0)
+            )
+            
+            # Limpa cache para atualizar as outras páginas instantaneamente
+            st.cache_data.clear() 
+            
+            # Grava na aba 'cronograma' do Google Sheets
             overwrite_data("cronograma", ed_crono)
-            st.success("Cronograma vinculado com sucesso!")
+            
+            st.success("✅ Ciclo de 7 dias salvo com sucesso!")
             st.rerun()
 
     with t2:
