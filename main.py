@@ -409,111 +409,114 @@ elif page == "Ciclo de Estudos":
     giro_global = calcular_giro_atual(df_estudo)
     st.markdown(f'<div class="giro-badge">🔄 Você está no Giro {giro_global} do Ciclo Global</div>', unsafe_allow_html=True)
     
-    # 2. Input de Carga Horária Semanal
+    # 2. Carga Horária Semanal
     horas_semana = st.number_input("Horas totais pretendidas na semana:", 5, 100, 25)
-    st.caption("Ajuste o Peso e Nível em cada card. O tempo é calculado instantaneamente.")
 
     st.write("---")
 
-    # 3. Lógica de Cálculo Proporcional (Pré-renderização)
-    # Precisamos calcular os fatores antes para que o tempo apareça dentro do card
+    # --- 3. LÓGICA DE CÁLCULO (Passo 1: Coletar valores atuais) ---
     fatores = []
     for m in materias_list:
+        # Busca o valor atual do slider no session_state ou usa o padrão 3
         p_val = st.session_state.get(f"p_ciclo_{m}", 3)
         n_val = st.session_state.get(f"n_ciclo_{m}", 3)
         fatores.append(p_val / n_val)
     
-    soma_fatores = sum(fatores)
+    soma_fatores = sum(fatores) if sum(fatores) > 0 else 1
 
-    # 4. Renderização dos Cards Integrados (3 colunas)
+    # --- 4. RENDERIZAÇÃO DOS CARDS E CONTROLES (Conforme a Imagem) ---
     cols = st.columns(3)
-    metas_calculadas = {} # Guardar para o botão de copiar
+    metas_calculadas = {} 
 
     for i, m in enumerate(materias_list):
         with cols[i % 3]:
-            # Controles de Ajuste
-            p_input = st.select_slider(f"Peso: {m}", [1,2,3,4,5], 3, key=f"p_ciclo_{m}")
-            n_input = st.select_slider(f"Nível: {m}", [1,2,3,4,5], 3, key=f"n_ciclo_{m}")
-            
-            # Cálculo do tempo para este card específico
-            fator_atual = p_input / n_input
-            horas_materia = (fator_atual / soma_fatores) * horas_semana if soma_fatores > 0 else 0
+            # A) Cálculo do tempo antes de desenhar o card
+            p_atual = st.session_state.get(f"p_ciclo_{m}", 3)
+            n_atual = st.session_state.get(f"n_ciclo_{m}", 3)
+            horas_materia = ((p_atual / n_atual) / soma_fatores) * horas_semana
             minutos_materia = int(horas_materia * 60)
             metas_calculadas[m] = minutos_materia
-            
-            # Card Visual Único (Nome + Tempo)
+
+            # B) CARD DE RESULTADO (No topo do bloco)
             st.markdown(f"""
-                <div style="background:#3a3b3c; padding:15px; border-radius:10px; border-top:4px solid #3ec6a8; text-align:center; margin-top:-10px; margin-bottom:20px;">
+                <div style="background:#3a3b3c; padding:15px; border-radius:10px; border-top:4px solid #3ec6a8; text-align:center; margin-bottom:10px;">
                     <b style="color:#b0b3b8; font-size:12px; text-transform:uppercase;">{m}</b><br>
-                    <span style="color:white; font-size:22px; font-weight:bold;">{decimal_para_horas(horas_materia)}</span><br>
+                    <span style="color:white; font-size:24px; font-weight:bold;">{decimal_para_horas(horas_materia)}</span><br>
                     <small style="color:#3ec6a8;">Carga Horária Sugerida</small>
                 </div>
             """, unsafe_allow_html=True)
 
+            # C) CONTROLES DE AJUSTE (Logo abaixo do card)
+            st.select_slider("Peso", [1,2,3,4,5], 3, key=f"p_ciclo_{m}")
+            st.select_slider("Nível", [1,2,3,4,5], 3, key=f"n_ciclo_{m}")
+            st.write("") # Espaçador
+
     st.divider()
 
-    # 5. Planilha de Execução de 7 Dias
+    # --- 5. CRONOGRAMA DE EXECUÇÃO ---
     st.subheader("🗓️ Cronograma de Execução (Fila de Estudos)")
     
-    # Botão Mágico: Copiar Sugestões para a Planilha
-    if st.button("🪄 Distribuir Tempos Calculados na Planilha", help="Aplica os minutos calculados acima nos campos de tempo da tabela"):
-        for i in range(1, 4): # Limpa e aplica nas colunas de tempo
-            col_m = f"Disciplina 0{i}"
-            col_t = f"Tempo D{i} (min)"
-            if col_m in df_cronograma.columns:
-                for idx, row in df_cronograma.iterrows():
+    # CORREÇÃO DO BOTÃO DE DISTRIBUIÇÃO
+    if st.button("🪄 Distribuir Tempos Calculados", use_container_width=True):
+        # Trabalhamos com uma cópia para garantir a reatividade
+        df_temp = df_cronograma.copy()
+        
+        # Mapeamos quantas vezes cada matéria aparece na planilha inteira
+        aparicoes = {}
+        for col in ["disciplina 01", "disciplina 02", "disciplina 03"]:
+            if col in df_temp.columns:
+                counts = df_temp[col].value_counts().to_dict()
+                for mat, count in counts.items():
+                    aparicoes[mat] = aparicoes.get(mat, 0) + count
+
+        # Distribuímos o tempo total calculado entre as aparições
+        for idx, row in df_temp.iterrows():
+            for i in range(1, 4):
+                col_m = f"disciplina 0{i}"
+                col_t = f"tempo d{i} (min)"
+                if col_m in df_temp.columns and col_t in df_temp.columns:
                     m_nome = row[col_m]
                     if m_nome in metas_calculadas:
-                        # Divide o tempo total pelo número de vezes que a matéria aparece no ciclo
-                        vezes_na_lista = (df_cronograma[["Disciplina 01", "Disciplina 02", "Disciplina 03"]] == m_nome).sum().sum()
-                        df_cronograma.at[idx, col_t] = int(metas_calculadas[m_nome] / vezes_na_lista) if vezes_na_lista > 0 else 0
-        st.success("Tempos distribuídos! Revise e clique em 'Salvar e Aplicar' abaixo.")
+                        total_min = metas_calculadas[m_nome]
+                        n_vezes = aparicoes.get(m_nome, 1)
+                        df_temp.at[idx, col_t] = int(total_min / n_vezes)
+        
+        # Salva o resultado no banco e limpa cache para atualizar a tela
+        overwrite_data("cronograma", df_temp)
+        st.success("Tempos distribuídos conforme sua meta! Clique em 'Salvar e Aplicar' para confirmar.")
+        st.rerun()
 
-    # Garantia de estrutura da planilha Dia 01 a 07
-    if df_cronograma.empty or "Disciplina 01" not in df_cronograma.columns:
-        dias_sequencia = [f"Dia {i:02d}" for i in range(1, 8)]
-        df_cronograma = pd.DataFrame({
-            "Ordem": dias_sequencia,
-            "Disciplina 01": ["-"] * 7, "Tempo D1 (min)": [60] * 7,
-            "Giros": [1] * 7,
-            "Disciplina 02": ["-"] * 7, "Tempo D2 (min)": [60] * 7,
-            "Disciplina 03": ["-"] * 7, "Tempo D3 (min)": [0] * 7,
-            "Total Dia (min)": [120] * 7
-        })
-
+    # Configuração da tabela (Data Editor)
     config_crono = {
-        "Ordem": st.column_config.TextColumn("Sequência", disabled=True),
-        "Disciplina 01": st.column_config.SelectboxColumn("Matéria 01", options=materias_list),
-        "Tempo D1 (min)": st.column_config.NumberColumn("Min. D1", min_value=0),
-        "Giros": st.column_config.NumberColumn("🌀 Giro", min_value=1),
-        "Disciplina 02": st.column_config.SelectboxColumn("Matéria 02", options=materias_list),
-        "Tempo D2 (min)": st.column_config.NumberColumn("Min. D2", min_value=0),
-        "Disciplina 03": st.column_config.SelectboxColumn("Matéria 03", options=materias_list),
-        "Tempo D3 (min)": st.column_config.NumberColumn("Min. D3", min_value=0),
-        "Total Dia (min)": st.column_config.NumberColumn("Soma Total", disabled=True)
+        "ordem": st.column_config.TextColumn("Sequência", disabled=True),
+        "disciplina 01": st.column_config.SelectboxColumn("Matéria 01", options=materias_list),
+        "tempo d1 (min)": st.column_config.NumberColumn("Min. D1"),
+        "giros": st.column_config.NumberColumn("🌀 Giro", min_value=1),
+        "disciplina 02": st.column_config.SelectboxColumn("Matéria 02", options=materias_list),
+        "tempo d2 (min)": st.column_config.NumberColumn("Min. D2"),
+        "disciplina 03": st.column_config.SelectboxColumn("Matéria 03", options=materias_list),
+        "tempo d3 (min)": st.column_config.NumberColumn("Min. D3"),
+        "total dia (min)": st.column_config.NumberColumn("Soma Total", disabled=True)
     }
 
-    ed_ciclo_final = st.data_editor(
+    ed_ciclo = st.data_editor(
         df_cronograma,
         num_rows="fixed",
         use_container_width=True,
         hide_index=True,
         column_config=config_crono,
-        key="editor_ciclo_completo"
+        key="editor_ciclo_vinal"
     )
 
     if st.button("💾 Salvar e Aplicar Ciclo", type="primary", use_container_width=True):
-        # Soma os tempos das 3 disciplinas para o total diário
-        ed_ciclo_final["Total Dia (min)"] = (
-            ed_ciclo_final["Tempo D1 (min)"].fillna(0) + 
-            ed_ciclo_final["Tempo D2 (min)"].fillna(0) + 
-            ed_ciclo_final["Tempo D3 (min)"].fillna(0)
+        ed_ciclo["total dia (min)"] = (
+            ed_ciclo["tempo d1 (min)"].fillna(0) + 
+            ed_ciclo["tempo d2 (min)"].fillna(0) + 
+            ed_ciclo["tempo d3 (min)"].fillna(0)
         )
-        st.cache_data.clear()
-        overwrite_data("cronograma", ed_ciclo_final)
-        st.success("✅ Ciclo salvo com sucesso! Dados sincronizados.")
+        overwrite_data("cronograma", ed_ciclo)
+        st.success("✅ Ciclo gravado com sucesso!")
         st.balloons()
-        st.rerun()
 
 elif page == "Gestão de Dados":
     st.title("⚙️ Painel de Controle")
