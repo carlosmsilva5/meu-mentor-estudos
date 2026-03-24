@@ -170,33 +170,80 @@ if page == "Home":
         col_grafico1, col_grafico2 = st.columns(2)
         
         with col_grafico1:
-            st.subheader("Desempenho por Disciplina")
+            st.subheader("Desempenho por Disciplina (Radar Colorido)")
             painel_disc = df_estudo.groupby("materia").agg(
-                tempo_total=("tempo_num", "sum"),
                 q_total=("total_q_num", "sum"),
                 q_acertos=("acertos_num", "sum"),
-                total_pag=("paginas_num", "sum")
             ).reset_index()
 
-            humor_map = df_estudo.groupby("materia")['humor'].agg(lambda x: x.mode()[0] if not x.mode().empty else "N/A").reset_index()
-            painel_disc = pd.merge(painel_disc, humor_map, on="materia", how="left")
-            
+            # Divisão de Tempo por Tipo (Necessário para a tabela, mas não para o radar)
             df_tipos = df_estudo.groupby(["materia", "tipo_estudo"])["tempo_num"].sum().unstack(fill_value=0).reset_index()
             for t in ["Teoria Novo", "Revisão", "Questões"]:
                 if t not in df_tipos.columns: df_tipos[t] = 0
             
-            painel_completo = pd.merge(painel_disc, df_tipos, on="materia", how="left")
+            # Junking final para a tabela de detalhamento
+            painel_detalhe = df_estudo.groupby("materia").agg(
+                tempo_total=("tempo_num", "sum"),
+                total_pag=("paginas_num", "sum")
+            ).reset_index()
+            humor_map = df_estudo.groupby("materia")['humor'].agg(lambda x: x.mode()[0] if not x.mode().empty else "N/A").reset_index()
+            painel_detalhe = pd.merge(painel_detalhe, humor_map, on="materia", how="left")
+            painel_completo = pd.merge(pd.merge(painel_disc, painel_detalhe, on="materia", how="left"), df_tipos, on="materia", how="left")
             painel_completo["aproveitamento"] = (painel_completo["q_acertos"] / painel_completo["q_total"] * 100).fillna(0)
-            
-            media_aprov = painel_completo["aproveitamento"].mean()
-            cor_radar = "#2ecc71" if media_aprov >= 85 else "#f1c40f" if media_aprov >= 75 else "#e74c3c"
 
-            fig_radar = px.line_polar(painel_completo, r='aproveitamento', theta='materia', line_close=True, markers=True, color_discrete_sequence=[cor_radar])
-            fig_radar.update_traces(fill='toself', fillcolor=cor_radar, opacity=0.3)
+            # --- NOVO GRÁFICO RADAR COM PREENCHIMENTO DEGRADÊ COLORIDO ---
+            import plotly.graph_objects as go
+
+            fig_radar = go.Figure()
+
+            # Adiciona a linha do radar (em branco para destacar)
+            fig_radar.add_trace(go.Scatterpolar(
+                r=painel_completo['aproveitamento'],
+                theta=painel_completo['materia'],
+                fill='toself',
+                name='Aproveitamento %',
+                line=dict(color='white', width=2),
+                marker=dict(color='white', size=6),
+                # Configuração do degradê de preenchimento
+                fillcolor='rgba(0,0,0,0)', # Base transparente
+            ))
+
+            # Configuração das Cores de Fundo (Polar Axis Colorscale)
+            # Esta é a mágica: define cores de fundo baseadas na escala r (0-100)
             fig_radar.update_layout(
-                polar=dict(bgcolor='rgba(0,0,0,0)', radialaxis=dict(visible=True, range=[0, 100], color='white', gridcolor='#4f4f4f', showticklabels=False),
-                angularaxis=dict(color='white', gridcolor='#4f4f4f')),
-                paper_bgcolor='rgba(0,0,0,0)', font=dict(color='white'), margin=dict(l=40, r=40, t=20, b=20)
+                polar=dict(
+                    bgcolor='rgba(0,0,0,0)',
+                    # Configuração da escala de cores no eixo radial
+                    radialaxis=dict(
+                        visible=True,
+                        range=[0, 100],
+                        color='white',
+                        gridcolor='#4f4f4f',
+                        showticklabels=False, # Oculta números internos
+                        # Define a escala de cores de fundo
+                        showline=False,
+                        tickmode='array',
+                        tickvals=[60, 70, 80, 90, 100],
+                    ),
+                    angularaxis=dict(color='white', gridcolor='#4f4f4f')
+                ),
+                # Adiciona formas coloridas de fundo para criar o efeito de escala
+                shapes=[
+                    # 91-100: Verde Escuro
+                    dict(type="circle", xref="polar", yref="polar", x0=-100, y0=-100, x1=100, y1=100, fillcolor="#1a531a", opacity=0.7, line_width=0, layer="below"),
+                    # 81-90: Verde Claro
+                    dict(type="circle", xref="polar", yref="polar", x0=-90, y0=-90, x1=90, y1=90, fillcolor="#2ecc71", opacity=0.7, line_width=0, layer="below"),
+                    # 71-80: Amarelo Claro
+                    dict(type="circle", xref="polar", yref="polar", x0=-80, y0=-80, x1=80, y1=80, fillcolor="#f1c40f", opacity=0.7, line_width=0, layer="below"),
+                    # 61-70: Vermelho
+                    dict(type="circle", xref="polar", yref="polar", x0=-70, y0=-70, x1=70, y1=70, fillcolor="#e74c3c", opacity=0.7, line_width=0, layer="below"),
+                    # 0-60: Centro (Transparente/Cinza escuro)
+                    dict(type="circle", xref="polar", yref="polar", x0=-60, y0=-60, x1=60, y1=60, fillcolor="#2b2d2e", opacity=1, line_width=0, layer="below"),
+                ],
+                paper_bgcolor='rgba(0,0,0,0)',
+                font=dict(color='white'),
+                margin=dict(l=80, r=80, t=20, b=20),
+                showlegend=False
             )
             st.plotly_chart(fig_radar, use_container_width=True)
 
@@ -216,24 +263,26 @@ if page == "Home":
             evol['horas_decimal'] = (evol['tempo_num'] / 60).round(2)
             evol['perc_acerto'] = (evol['acertos_num'] / evol['total_q_num'] * 100).fillna(0).round(1)
 
-            # GRÁFICO 1: EVOLUÇÃO DE CARGA HORÁRIA
+            # GRÁFICO 1: EVOLUÇÃO DE CARGA HORÁRIA (Eixo Y Visível)
             st.subheader("Evolução de Carga Horária")
             fig_horas = px.line(evol, x='data_label', y='horas_decimal', markers=True, text='texto_tempo', color_discrete_sequence=['#3ec6a8'])
             fig_horas.update_traces(textposition="top center")
             fig_horas.update_layout(
-                yaxis=dict(rangemode='tozero', gridcolor='#4f4f4f', title="Horas"), xaxis=dict(gridcolor='#4f4f4f', title=""),
-                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='white'), height=250, margin=dict(l=20, r=20, t=30, b=20)
+                yaxis=dict(rangemode='tozero', gridcolor='#4f4f4f', title="Horas Estudadas", tickfont=dict(color='white', size=12)), # <--- EIXO Y VISÍVEL E CLARO
+                xaxis=dict(gridcolor='#4f4f4f', title="", tickfont=dict(color='white', size=12)),
+                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='white'), height=280, margin=dict(l=20, r=20, t=30, b=20)
             )
             st.plotly_chart(fig_horas, use_container_width=True)
 
-            # GRÁFICO 2: TAXA DE ACERTOS
+            # GRÁFICO 2: TAXA DE ACERTOS (Eixo Y Visível)
             st.subheader("Desempenho Geral (7 Dias)")
             fig_aprov = px.line(evol, x='data_label', y='perc_acerto', markers=True, text='texto_aprov', color_discrete_sequence=['#ffffff'])
             fig_aprov.update_traces(textposition="top center")
-            fig_aprov.add_hline(y=90, line_dash="dash", line_color="#4f4f4f", annotation_text="Meta 90%")
+            fig_aprov.add_hline(y=90, line_dash="dash", line_color="#2ecc71", annotation_text="Meta 90%", annotation_font_color="#2ecc71")
             fig_aprov.update_layout(
-                yaxis=dict(range=[0, 105], gridcolor='#4f4f4f', title="% Acerto"), xaxis=dict(gridcolor='#4f4f4f', title=""),
-                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='white'), height=250, margin=dict(l=20, r=20, t=30, b=20)
+                yaxis=dict(range=[0, 105], gridcolor='#4f4f4f', title="% Acerto", tickfont=dict(color='white', size=12)), # <--- EIXO Y VISÍVEL E CLARO
+                xaxis=dict(gridcolor='#4f4f4f', title="", tickfont=dict(color='white', size=12)),
+                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='white'), height=280, margin=dict(l=20, r=20, t=30, b=20)
             )
             st.plotly_chart(fig_aprov, use_container_width=True)
 
