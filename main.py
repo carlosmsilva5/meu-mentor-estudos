@@ -544,12 +544,41 @@ elif page == "Gestão de Dados":
             st.rerun()
 
     with t2:
-        nova = st.text_input("Nova Matéria")
-        if st.button("Adicionar Disciplina"):
-            nova_lista = ",".join(materias_list + [nova])
-            overwrite_data("config", pd.DataFrame([{"materias": nova_lista}]))
-            st.success(f"{nova} adicionada!")
-            st.rerun()
+        st.markdown("### 📚 Gerenciar Disciplinas")
+        
+        # --- ADICIONAR NOVA MATÉRIA ---
+        with st.expander("➕ Adicionar Nova Disciplina", expanded=True):
+            nova = st.text_input("Nome da Matéria")
+            if st.button("Confirmar Adição"):
+                if nova and nova not in materias_list:
+                    nova_lista = ",".join(materias_list + [nova])
+                    overwrite_data("config", pd.DataFrame([{"materias": nova_lista}]))
+                    st.success(f"✅ {nova} adicionada com sucesso!")
+                    st.rerun()
+                elif nova in materias_list:
+                    st.warning("Esta matéria já está cadastrada.")
+                else:
+                    st.error("Digite um nome válido.")
+
+        st.divider()
+
+        # --- EXCLUIR MATÉRIA EXISTENTE ---
+        with st.expander("🗑️ Excluir Disciplina"):
+            if materias_list:
+                materia_para_excluir = st.selectbox("Selecione a matéria para remover:", materias_list)
+                
+                st.warning(f"Atenção: Excluir '{materia_para_excluir}' não apagará seu histórico de estudos, mas ela não aparecerá mais nos novos registros ou ciclos.")
+                
+                if st.button("🚨 Excluir Definitivamente", type="secondary"):
+                    # Filtra a lista removendo a matéria selecionada
+                    nova_lista_materias = [m for m in materias_list if m != materia_para_excluir]
+                    nova_string = ",".join(nova_lista_materias)
+                    
+                    overwrite_data("config", pd.DataFrame([{"materias": nova_string}]))
+                    st.success(f"❌ {materia_para_excluir} removida!")
+                    st.rerun()
+            else:
+                st.info("Nenhuma matéria cadastrada para excluir.")
             
     with t3:
         st.markdown("### Editar Histórico de Sessões")
