@@ -145,7 +145,7 @@ if page == "Home":
         df_estudo['tempo_num'] = pd.to_numeric(df_estudo['tempo'], errors='coerce').fillna(0)
         df_estudo['acertos_num'] = pd.to_numeric(df_estudo['acertos'], errors='coerce').fillna(0)
         df_estudo['total_q_num'] = pd.to_numeric(df_estudo['total_q'], errors='coerce').fillna(0)
-        # Garante que as novas colunas existam (blindagem)
+        
         for col in ['paginas', 'humor', 'tipo_estudo']:
             if col not in df_estudo.columns:
                 df_estudo[col] = 0 if col == 'paginas' else "N/A"
@@ -166,12 +166,11 @@ if page == "Home":
     st.divider()
 
     if not df_estudo.empty:
+        # --- BLOCO SUPERIOR: RADAR E EVOLUÇÃO ---
         col_grafico1, col_grafico2 = st.columns(2)
         
         with col_grafico1:
             st.subheader("Desempenho por Disciplina")
-            
-            # Agrupamento Principal
             painel_disc = df_estudo.groupby("materia").agg(
                 tempo_total=("tempo_num", "sum"),
                 q_total=("total_q_num", "sum"),
@@ -179,140 +178,74 @@ if page == "Home":
                 total_pag=("paginas_num", "sum")
             ).reset_index()
 
-            # Humor Predominante
             humor_map = df_estudo.groupby("materia")['humor'].agg(lambda x: x.mode()[0] if not x.mode().empty else "N/A").reset_index()
             painel_disc = pd.merge(painel_disc, humor_map, on="materia", how="left")
             
-            # Divisão de Tempo por Tipo
             df_tipos = df_estudo.groupby(["materia", "tipo_estudo"])["tempo_num"].sum().unstack(fill_value=0).reset_index()
             for t in ["Teoria Novo", "Revisão", "Questões"]:
                 if t not in df_tipos.columns: df_tipos[t] = 0
             
             painel_completo = pd.merge(painel_disc, df_tipos, on="materia", how="left")
-            
-            # --- RECUPERAÇÃO DO GRÁFICO RADAR (ESTILO PREMIUM MANTIDO) ---
             painel_completo["aproveitamento"] = (painel_completo["q_acertos"] / painel_completo["q_total"] * 100).fillna(0)
             
-            # 1. Definir a cor dinâmica baseada na média de aproveitamento
             media_aprov = painel_completo["aproveitamento"].mean()
-            if media_aprov >= 90: cor_radar = "#2ecc71"    # Verde
-            elif media_aprov >= 80: cor_radar = "#f1c40f"  # Amarelo
-            elif media_aprov >= 70: cor_radar = "#e67e22"  # Laranja
-            else: cor_radar = "#e74c3c"                    # Vermelho
+            cor_radar = "#2ecc71" if media_aprov >= 85 else "#f1c40f" if media_aprov >= 75 else "#e74c3c"
 
-            # 2. Criar o gráfico com a cor definida
-            fig_radar = px.line_polar(
-                painel_completo, 
-                r='aproveitamento', 
-                theta='materia', 
-                line_close=True,
-                markers=True,
-                color_discrete_sequence=[cor_radar]
-            )
-            
-            # Preenche a área com a cor dinâmica e transparência (0.3)
+            fig_radar = px.line_polar(painel_completo, r='aproveitamento', theta='materia', line_close=True, markers=True, color_discrete_sequence=[cor_radar])
             fig_radar.update_traces(fill='toself', fillcolor=cor_radar, opacity=0.3)
-
             fig_radar.update_layout(
-                polar=dict(
-                    bgcolor='rgba(0,0,0,0)', 
-                    radialaxis=dict(
-                        visible=True, 
-                        range=[0, 100], 
-                        color='white', 
-                        gridcolor='#4f4f4f',
-                        showticklabels=False  # <--- ISSO REMOVE OS NÚMEROS INTERNOS
-                    ),
-                    angularaxis=dict(color='white', gridcolor='#4f4f4f')
-                ),
-                paper_bgcolor='rgba(0,0,0,0)', 
-                plot_bgcolor='rgba(0,0,0,0)', 
-                font=dict(color='white'),
-                margin=dict(l=40, r=40, t=20, b=20)
+                polar=dict(bgcolor='rgba(0,0,0,0)', radialaxis=dict(visible=True, range=[0, 100], color='white', gridcolor='#4f4f4f', showticklabels=False),
+                angularaxis=dict(color='white', gridcolor='#4f4f4f')),
+                paper_bgcolor='rgba(0,0,0,0)', font=dict(color='white'), margin=dict(l=40, r=40, t=20, b=20)
             )
-            st.plotly_chart(fig_radar, use_container_width=True, config={'staticPlot': True})
-            # -------------------------------------------------------------
-            
-            # --- TABELA DE DETALHAMENTO ATUALIZADA ---
-            st.markdown("#### Detalhamento das Matérias")
-            tab_v = painel_completo.copy()
-            
-            # Formatação de Tempos
-            tab_v["Total"] = tab_v["tempo_total"].apply(formatar_tempo)
-            tab_v["Teoria"] = tab_v["Teoria Novo"].apply(formatar_tempo)
-            tab_v["Rev."] = tab_v["Revisão"].apply(formatar_tempo)
-            tab_v["Ques. (Tempo)"] = tab_v["Questões"].apply(formatar_tempo)
-            
-            # Formatação de Performance
-            tab_v["Aprov."] = tab_v["aproveitamento"].map("{:.1f}%".format)
-            
-            # Seleção das Colunas (Incluindo o número de questões 'q_total')
-            cols_final = [
-                "materia", "Total", "Teoria", "Rev.", 
-                "Ques. (Tempo)", "q_total", "total_pag", "humor", "Aprov."
-            ]
-            
-            # Renomeação para exibição limpa
-            st.dataframe(
-                tab_v[cols_final].rename(columns={
-                    "materia": "Matéria", 
-                    "q_total": "Nº Quest.", 
-                    "total_pag": "Págs", 
-                    "humor": "Humor"
-                }), 
-                use_container_width=True, 
-                hide_index=True
-            )
+            st.plotly_chart(fig_radar, use_container_width=True)
 
         with col_grafico2:
-            # 1. Preparação dos Dados (7 dias)
+            st.subheader("Evolução de Carga Horária")
             hoje = pd.Timestamp.today().normalize()
             df_dias = pd.DataFrame({'data': pd.date_range(end=hoje, periods=7)})
             df_estudo['data_fmt'] = pd.to_datetime(df_estudo['data'], format='%d/%m/%Y', errors='coerce')
             
-            est_agrup = df_estudo.groupby('data_fmt').agg({
-                "tempo_num": "sum",
-                "acertos_num": "sum",
-                "total_q_num": "sum"
-            }).reset_index()
-            
+            est_agrup = df_estudo.groupby('data_fmt').agg({"tempo_num": "sum", "acertos_num": "sum", "total_q_num": "sum"}).reset_index()
             evol = pd.merge(df_dias, est_agrup, left_on='data', right_on='data_fmt', how='left').fillna(0)
             evol['data_label'] = evol['data'].dt.strftime('%d/%m')
             
-            # --- LÓGICA DE FORMATAÇÃO 00h00min ---
-            def formatar_para_grafico(minutos):
-                h = int(minutos // 60)
-                m = int(minutos % 60)
-                return f"{h:02d}h{m:02d}min"
-
-            evol['tempo_formatado'] = evol['tempo_num'].apply(formatar_para_grafico)
-            evol['horas_decimal'] = (evol['tempo_num'] / 60).round(2)
-            evol['perc_acerto'] = (evol['acertos_num'] / evol['total_q_num'] * 100).fillna(0).round(1)
+            # LÓGICA SOLICITADA: Ocultar número se for 0
+            evol['texto_tempo'] = evol['tempo_num'].apply(lambda x: f"{int(x//60)}h{int(x%60)}m" if x > 0 else "")
+            evol['texto_aprov'] = evol.apply(lambda x: f"{int(x['acertos_num']/x['total_q_num']*100)}%" if x['total_q_num'] > 0 else "", axis=1)
             
-            # 2. Gráfico 1: Horas Estudadas (Texto Fixo Formatado)
-            st.subheader("Evolução de Carga Horária (7 Dias)")
-            fig_horas = px.line(evol, x='data_label', y='horas_decimal', markers=True, text='tempo_formatado', color_discrete_sequence=['#3ec6a8'])
-            fig_horas.update_traces(textposition="top center")
-            fig_horas.update_layout(
-                yaxis=dict(rangemode='tozero', gridcolor='#4f4f4f', title="Tempo"), 
-                xaxis=dict(gridcolor='#4f4f4f', title="Data"),
+            evol['horas_decimal'] = (evol['tempo_num'] / 60).round(2)
+            
+            fig_evol = px.line(evol, x='data_label', y='horas_decimal', markers=True, text='texto_tempo', color_discrete_sequence=['#3ec6a8'])
+            fig_evol.update_traces(textposition="top center")
+            fig_evol.update_layout(
+                yaxis=dict(rangemode='tozero', gridcolor='#4f4f4f', title="Horas"),
+                xaxis=dict(gridcolor='#4f4f4f', title=""),
                 paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='white'),
                 margin=dict(l=20, r=20, t=30, b=20)
             )
-            st.plotly_chart(fig_horas, use_container_width=True, config={'staticPlot': True})
+            st.plotly_chart(fig_evol, use_container_width=True)
 
-            # 3. Gráfico 2: Desempenho Geral (Texto Fixo %)
-            st.subheader("Desempenho Geral (7 Dias)")
-            fig_desempenho = px.line(evol, x='data_label', y='perc_acerto', markers=True, text='perc_acerto', color_discrete_sequence=['#ffffff'])
-            fig_desempenho.update_traces(textposition="top center", texttemplate='%{text}%')
-            fig_desempenho.add_hline(y=90, line_dash="dash", line_color="#4f4f4f", annotation_text="Meta 90%")
-            fig_desempenho.update_layout(
-                yaxis=dict(range=[0, 105], gridcolor='#4f4f4f', title="% Acerto"), 
-                xaxis=dict(gridcolor='#4f4f4f', title="Data"),
-                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='white'),
-                margin=dict(l=20, r=20, t=30, b=20)
-            )
-            st.plotly_chart(fig_desempenho, use_container_width=True, config={'staticPlot': True})
+        # --- BLOCO INFERIOR: TABELA FULL WIDTH ---
+        st.divider()
+        st.subheader("📊 Detalhamento das Matérias")
+        tab_v = painel_completo.copy()
+        
+        tab_v["Total"] = tab_v["tempo_total"].apply(formatar_tempo)
+        tab_v["Teoria"] = tab_v["Teoria Novo"].apply(formatar_tempo)
+        tab_v["Rev."] = tab_v["Revisão"].apply(formatar_tempo)
+        tab_v["Ques. (Tempo)"] = tab_v["Questões"].apply(formatar_tempo)
+        tab_v["Aprov."] = tab_v["aproveitamento"].map("{:.1f}%".format)
+        
+        cols_final = ["materia", "Total", "Teoria", "Rev.", "Ques. (Tempo)", "q_total", "total_pag", "humor", "Aprov."]
+        
+        st.dataframe(
+            tab_v[cols_final].rename(columns={
+                "materia": "Matéria", "q_total": "Nº Quest.", "total_pag": "Págs", "humor": "Humor"
+            }), 
+            use_container_width=True, 
+            hide_index=True
+        )
 
 elif page == "Registrar Estudo":
     st.title("🧮 Novo Registro")
