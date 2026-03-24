@@ -544,54 +544,12 @@ elif page == "Gestão de Dados":
             st.rerun()
 
     with t2:
-        st.markdown("### 📚 Gerenciar Disciplinas")
-        
-        # 1. Tenta ler a aba 'materias'
-        try:
-            df_raw = conn.read(worksheet="materias")
-            
-            # Limpeza de segurança: remove linhas vazias e garante nomes de colunas limpos
-            if df_raw is not None and not df_raw.empty:
-                df_materias_gestao = df_raw.dropna(how='all')
-                # Força o nome da coluna para 'materia' caso venha diferente
-                df_materias_gestao.columns = [str(c).strip().lower() for c in df_materias_gestao.columns]
-                
-                if 'materia' not in df_materias_gestao.columns:
-                    df_materias_gestao = pd.DataFrame(columns=["materia"])
-            else:
-                df_materias_gestao = pd.DataFrame(columns=["materia"])
-                
-        except Exception:
-            # Caso a aba não exista ou falhe a leitura
-            df_materias_gestao = pd.DataFrame(columns=["materia"])
-
-        st.info("Adicione disciplinas na última linha ou edite as existentes.")
-        
-        # 2. O Editor de Tabela (Com proteção de tipo)
-        # Se o DF estiver vazio, adicionamos uma linha em branco para o Streamlit entender o tipo 'texto'
-        if df_materias_gestao.empty:
-            df_materias_gestao = pd.DataFrame([{"materia": ""}])
-
-        ed_materias = st.data_editor(
-            df_materias_gestao, 
-            num_rows="dynamic", 
-            key="editor_safe_materias", 
-            use_container_width=True,
-            hide_index=True
-        )
-
-        # 3. Botão Salvar
-        if st.button("💾 Salvar Alterações", type="primary"):
-            try:
-                # Remove linhas onde a matéria ficou vazia antes de salvar
-                df_para_salvar = ed_materias[ed_materias['materia'].str.strip() != ""]
-                
-                st.cache_data.clear()
-                overwrite_data("materias", df_para_salvar)
-                st.success("Disciplinas atualizadas!")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Erro ao salvar: {e}")
+        nova = st.text_input("Nova Matéria")
+        if st.button("Adicionar Disciplina"):
+            nova_lista = ",".join(materias_list + [nova])
+            overwrite_data("config", pd.DataFrame([{"materias": nova_lista}]))
+            st.success(f"{nova} adicionada!")
+            st.rerun()
             
     with t3:
         st.markdown("### Editar Histórico de Sessões")
