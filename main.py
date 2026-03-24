@@ -411,7 +411,6 @@ elif page == "Ciclo de Estudos":
     
     # 2. Carga Horária Semanal
     horas_semana = st.number_input("Horas totais pretendidas na semana:", 5, 100, 25)
-    st.caption("Marque as disciplinas ativas. As desmarcadas não receberão carga horária.")
 
     st.write("---")
 
@@ -437,18 +436,15 @@ elif page == "Ciclo de Estudos":
             p_atual = st.session_state.get(f"p_ciclo_{m}", 3)
             n_atual = st.session_state.get(f"n_ciclo_{m}", 3)
             
-            horas_materia = ((p_atual / n_atual) / soma_fatores) * horas_semana if ativo else 0.0
-            metas_calculadas_horas[m] = round(horas_materia, 2)
-
-            bg_card = "#3a3b3c" if ativo else "#202225"
-            border_card = "#3ec6a8" if ativo else "#4f4f4f"
-            opacity = "1" if ativo else "0.3"
+            # Cálculo do tempo sugerido
+            horas_sug = ((p_atual / n_atual) / soma_fatores) * horas_semana if ativo else 0.0
+            metas_calculadas_horas[m] = round(horas_sug, 2)
 
             st.markdown(f"""
-                <div style="background:{bg_card}; padding:15px; border-radius:10px; border-top:4px solid {border_card}; text-align:center; margin-bottom:10px; opacity:{opacity};">
+                <div style="background:{'#3a3b3c' if ativo else '#202225'}; padding:15px; border-radius:10px; border-top:4px solid {'#3ec6a8' if ativo else '#4f4f4f'}; text-align:center; margin-bottom:10px; opacity:{'1' if ativo else '0.3'};">
                     <b style="color:#b0b3b8; font-size:12px; text-transform:uppercase;">{m}</b><br>
-                    <span style="color:white; font-size:24px; font-weight:bold;">{decimal_para_horas(horas_materia)}</span><br>
-                    <small style="color:{border_card};">{"Meta Semanal" if ativo else "Fora do Ciclo"}</small>
+                    <span style="color:white; font-size:24px; font-weight:bold;">{decimal_para_horas(horas_sug)}</span><br>
+                    <small style="color:{'#3ec6a8' if ativo else '#4f4f4f'};">{"Meta Semanal" if ativo else "Fora do Ciclo"}</small>
                 </div>
             """, unsafe_allow_html=True)
 
@@ -460,101 +456,74 @@ elif page == "Ciclo de Estudos":
     # --- 5. CRONOGRAMA DE EXECUÇÃO (EDITOR) ---
     st.subheader("🗓️ Cronograma de Execução (Editor)")
     
-    if st.button("🪄 Distribuir Horas Calculadas", use_container_width=True):
+    if st.button("🪄 Distribuir Horas Calculadas na Tabela", use_container_width=True):
         df_temp = df_cronograma.copy()
+        
+        # Mapear aparições para dividir o tempo corretamente
         aparicoes = {}
-        for col in ["disciplina 01", "disciplina 02", "disciplina 03"]:
-            if col in df_temp.columns:
-                counts = df_temp[col].value_counts().to_dict()
-                for mat, count in counts.items():
-                    aparicoes[mat] = aparicoes.get(mat, 0) + count
+        for c in ["disciplina 01", "disciplina 02", "disciplina 03"]:
+            if c in df_temp.columns:
+                for mat in df_temp[c].dropna():
+                    if mat != "-":
+                        aparicoes[mat] = aparicoes.get(mat, 0) + 1
 
+        # Aplicar os tempos sugeridos divididos pelas aparições
         for idx, row in df_temp.iterrows():
+            dia_total = 0
             for i in range(1, 4):
                 col_m = f"disciplina 0{i}"
                 col_h = f"tempo d{i} (h)"
-                if col_m in df_temp.columns:
-                    m_nome = row[col_m]
-                    total_h = metas_calculadas_horas.get(m_nome, 0)
-                    n_vezes = aparicoes.get(m_nome, 1)
-                    df_temp.at[idx, col_h] = round(total_h / n_vezes, 2)
+                m_nome = str(row.get(col_m, "-")).strip()
+                
+                if m_nome in metas_calculadas_horas:
+                    v_vezes = aparicoes.get(m_nome, 1)
+                    valor_h = metas_calculadas_horas[m_nome] / v_vezes
+                    df_temp.at[idx, col_h] = round(valor_h, 2)
+                    dia_total += valor_h
+            df_temp.at[idx, "total dia (h)"] = round(dia_total, 2)
         
         overwrite_data("cronograma", df_temp)
+        st.success("🪄 Horas distribuídas! Revise e clique em 'Salvar e Aplicar' abaixo.")
         st.rerun()
 
-    # Configuração da tabela
+    # Configuração do Editor
     config_crono = {
         "ordem": st.column_config.TextColumn("Sequência", disabled=True),
-        "disciplina 01": st.column_config.SelectboxColumn("Matéria 01", options=materias_list),
+        "disciplina 01": st.column_config.SelectboxColumn("Materia 01", options=materias_list),
         "tempo d1 (h)": st.column_config.NumberColumn("H. D1", format="%.2f h"),
         "giros": st.column_config.NumberColumn("🌀 Giro"),
-        "disciplina 02": st.column_config.SelectboxColumn("Matéria 02", options=materias_list),
+        "disciplina 02": st.column_config.SelectboxColumn("Materia 02", options=materias_list),
         "tempo d2 (h)": st.column_config.NumberColumn("H. D2", format="%.2f h"),
-        "disciplina 03": st.column_config.SelectboxColumn("Matéria 03", options=materias_list),
+        "disciplina 03": st.column_config.SelectboxColumn("Materia 03", options=materias_list),
         "tempo d3 (h)": st.column_config.NumberColumn("H. D3", format="%.2f h"),
         "total dia (h)": st.column_config.NumberColumn("Total Dia", format="%.2f h", disabled=True)
     }
 
-    ed_ciclo = st.data_editor(df_cronograma, num_rows="fixed", use_container_width=True, hide_index=True, column_config=config_crono, key="ed_ciclo_final_final")
+    ed_ciclo = st.data_editor(df_cronograma, num_rows="fixed", use_container_width=True, hide_index=True, column_config=config_crono, key="ed_ciclo_final_fix")
 
     if st.button("💾 Salvar e Aplicar Ciclo", type="primary", use_container_width=True):
         ed_ciclo["total dia (h)"] = ed_ciclo["tempo d1 (h)"].fillna(0) + ed_ciclo["tempo d2 (h)"].fillna(0) + ed_ciclo["tempo d3 (h)"].fillna(0)
+        # Salva em minutos para compatibilidade com o Dashboard
         for i in range(1, 4):
             ed_ciclo[f"tempo d{i} (min)"] = (ed_ciclo[f"tempo d{i} (h)"] * 60).astype(int)
         overwrite_data("cronograma", ed_ciclo)
         st.success("✅ Ciclo atualizado e salvo!")
         st.rerun()
 
-    # --- 6. FIGURA VISUAL DO CRONOGRAMA APLICADO (RESUMO) ---
+    # --- 6. FIGURA VISUAL DO CRONOGRAMA (RESUMO) ---
     st.write("---")
     st.subheader("🖼️ Visualização do Cronograma Salvo")
     
-    # Criando a tabela HTML personalizada com tratamento de dados
-    html_tabela = """
-    <table style="width:100%; border-collapse: collapse; background-color: #3a3b3c; color: white; border-radius: 10px; overflow: hidden; border: 1px solid #4f4f4f;">
-        <thead>
-            <tr style="background-color: #202225; color: #3ec6a8; text-align: left;">
-                <th style="padding: 12px; border: 1px solid #4f4f4f;">Sequência</th>
-                <th style="padding: 12px; border: 1px solid #4f4f4f;">Matéria 01</th>
-                <th style="padding: 12px; border: 1px solid #4f4f4f; text-align: center;">🌀 Giro</th>
-                <th style="padding: 12px; border: 1px solid #4f4f4f;">Matéria 02</th>
-                <th style="padding: 12px; border: 1px solid #4f4f4f;">Matéria 03</th>
-                <th style="padding: 12px; border: 1px solid #4f4f4f; background-color: #2b2d2e;">Total Dia</th>
-            </tr>
-        </thead>
-        <tbody>
-    """
+    html_tabela = """<table style="width:100%; border-collapse: collapse; background-color: #3a3b3c; color: white; border-radius: 10px; overflow: hidden; border: 1px solid #4f4f4f;"><thead><tr style="background-color: #202225; color: #3ec6a8; text-align: left;"><th style="padding: 12px; border: 1px solid #4f4f4f;">Sequência</th><th style="padding: 12px; border: 1px solid #4f4f4f;">Matéria 01</th><th style="padding: 12px; border: 1px solid #4f4f4f; text-align: center;">🌀 Giro</th><th style="padding: 12px; border: 1px solid #4f4f4f;">Matéria 02</th><th style="padding: 12px; border: 1px solid #4f4f4f;">Matéria 03</th><th style="padding: 12px; border: 1px solid #4f4f4f; background-color: #2b2d2e; text-align: center;">Total Dia</th></tr></thead><tbody>"""
     
     for _, row in df_cronograma.iterrows():
-        # Tratamento de valores nulos ou vazios para as disciplinas
-        m1 = row.get('disciplina 01', '-')
-        m2 = row.get('disciplina 02', '-')
-        m3 = row.get('disciplina 03', '-')
-        
-        # Tratamento para não exibir "nan" e sim "-"
-        m1 = m1 if pd.notna(m1) and m1 != "nan" else "-"
-        m2 = m2 if pd.notna(m2) and m2 != "nan" else "-"
-        m3 = m3 if pd.notna(m3) and m3 != "nan" else "-"
-
-        # Formatação dos tempos (se for 0 ou nulo, mostra vazio ou 0.00)
-        t1 = f"{row.get('tempo d1 (h)', 0):.2f}h" if m1 != "-" else ""
-        t2 = f"{row.get('tempo d2 (h)', 0):.2f}h" if m2 != "-" else ""
-        t3 = f"{row.get('tempo d3 (h)', 0):.2f}h" if m3 != "-" else ""
+        m1, m2, m3 = [str(row.get(f'disciplina 0{i}', '-')) for i in range(1, 4)]
+        t1, t2, t3 = [f"{row.get(f'tempo d{i} (h)', 0):.2f}h" if x != '-' and x != 'nan' else "" for i, x in enumerate([m1, m2, m3], 1)]
         total_dia = f"{row.get('total dia (h)', 0):.2f}h"
 
-        html_tabela += f"""
-            <tr style="border-bottom: 1px solid #4f4f4f;">
-                <td style="padding: 10px; border: 1px solid #4f4f4f; font-weight: bold; background: #2b2d2e; text-align: center;">{row['ordem']}</td>
-                <td style="padding: 10px; border: 1px solid #4f4f4f;">{m1} <br><small style='color:#3ec6a8'>{t1}</small></td>
-                <td style="padding: 10px; border: 1px solid #4f4f4f; text-align: center;">{int(row.get('giros', 1))}</td>
-                <td style="padding: 10px; border: 1px solid #4f4f4f;">{m2} <br><small style='color:#3ec6a8'>{t2}</small></td>
-                <td style="padding: 10px; border: 1px solid #4f4f4f;">{m3} <br><small style='color:#3ec6a8'>{t3}</small></td>
-                <td style="padding: 10px; border: 1px solid #4f4f4f; font-weight: bold; color: #3ec6a8; background: #2b2d2e; text-align: center;">{total_dia}</td>
-            </tr>
-        """
+        html_tabela += f"""<tr style="border-bottom: 1px solid #4f4f4f;"><td style="padding: 10px; border: 1px solid #4f4f4f; font-weight: bold; background: #2b2d2e; text-align: center;">{row['ordem']}</td><td style="padding: 10px; border: 1px solid #4f4f4f;">{m1 if m1 != 'nan' else '-'} <br><small style='color:#3ec6a8'>{t1}</small></td><td style="padding: 10px; border: 1px solid #4f4f4f; text-align: center;">{int(row.get('giros', 1))}</td><td style="padding: 10px; border: 1px solid #4f4f4f;">{m2 if m2 != 'nan' else '-'} <br><small style='color:#3ec6a8'>{t2}</small></td><td style="padding: 10px; border: 1px solid #4f4f4f;">{m3 if m3 != 'nan' else '-'} <br><small style='color:#3ec6a8'>{t3}</small></td><td style="padding: 10px; border: 1px solid #4f4f4f; font-weight: bold; color: #3ec6a8; background: #2b2d2e; text-align: center;">{total_dia}</td></tr>"""
     
-    html_tabela += "</tbody></table>"
-    st.markdown(html_tabela, unsafe_allow_html=True)
+    st.markdown(html_tabela + "</tbody></table>", unsafe_allow_html=True)
 
 elif page == "Gestão de Dados":
     st.title("⚙️ Painel de Controle")
