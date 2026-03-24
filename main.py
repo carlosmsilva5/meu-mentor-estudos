@@ -546,25 +546,22 @@ elif page == "Gestão de Dados":
     with t2:
         st.markdown("### 📚 Gerenciar Disciplinas")
         
-        # 1. BUSCA REAL: Tenta ler a aba 'materias' do seu Google Sheets
+        # 1. Tenta ler a aba, se der erro, cria um DataFrame vazio com a coluna certa
         try:
-            # Forçamos a conexão a ler a aba específica de matérias
-            df_materias_existentes = conn.read(worksheet="materias").dropna(how='all')
-            
-            # Se a coluna não existir ou o DF estiver vazio, criamos um padrão
-            if df_materias_existentes.empty or 'materia' not in df_materias_existentes.columns:
-                df_materias_existentes = pd.DataFrame(columns=["materia"])
-        except Exception as e:
-            st.error(f"Erro ao acessar a aba 'materias': {e}")
-            df_materias_existentes = pd.DataFrame(columns=["materia"])
+            df_materias_gestao = conn.read(worksheet="materias").dropna(how='all')
+            if 'materia' not in df_materias_gestao.columns:
+                df_materias_gestao = pd.DataFrame(columns=["materia"])
+        except Exception:
+            # Se a aba não existir no Sheets, mostra o aviso amigável
+            st.warning("⚠️ A aba 'materias' não foi encontrada no seu Google Sheets. Por favor, crie uma aba chamada 'materias' com o cabeçalho 'materia' na célula A1.")
+            df_materias_gestao = pd.DataFrame(columns=["materia"])
 
-        st.info("Abaixo você pode editar nomes, excluir linhas ou adicionar novas disciplinas na última linha.")
-        
-        # 2. O EDITOR DE TABELA: Agora ele usa o DataFrame que acabou de ler
+        # 2. O Editor de Tabela
+        st.info("Clique na última linha para adicionar ou selecione uma linha e aperte 'Delete' para excluir.")
         ed_materias = st.data_editor(
-            df_materias_existentes, 
-            num_rows="dynamic", # Isso permite que você delete e adicione linhas livremente
-            key="editor_gestao_materias", 
+            df_materias_gestao, 
+            num_rows="dynamic", 
+            key="editor_final_materias", 
             use_container_width=True,
             hide_index=True,
             column_config={
@@ -572,15 +569,15 @@ elif page == "Gestão de Dados":
             }
         )
 
-        # 3. SALVAMENTO: Sobrescreve a aba 'materias' com o que está na tela
+        # 3. Botão Salvar
         if st.button("💾 Salvar Alterações", type="primary"):
             try:
-                st.cache_data.clear() # Limpa o cache para o resto do app atualizar
+                st.cache_data.clear()
                 overwrite_data("materias", ed_materias)
-                st.success("Lista de disciplinas atualizada com sucesso!")
+                st.success("Disciplinas atualizadas! Agora elas aparecerão no Ciclo e no Registro.")
                 st.rerun()
             except Exception as e:
-                st.error(f"Erro ao salvar: {e}")
+                st.error(f"Erro ao salvar: Verifique se a aba 'materias' existe no Sheets. Detalhe: {e}")
             
     with t3:
         st.markdown("### Editar Histórico de Sessões")
