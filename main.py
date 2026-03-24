@@ -405,217 +405,151 @@ elif page == "Caderno de Erros":
 elif page == "Ciclo de Estudos":
     st.title("🎯 Planejamento do Ciclo")
     
-    # 1. Badge de Giro Global
+    # 1. Badge de Giro Global e Inputs de Topo
     giro_global = calcular_giro_atual(df_estudo)
     st.markdown(f'<div class="giro-badge">🔄 Você está no Giro {giro_global} do Ciclo Global</div>', unsafe_allow_html=True)
     
-    # 2. Configuração de Carga Horária Semanal
     col_topo1, col_topo2 = st.columns([1, 1.5])
+    
     with col_topo1:
         horas_semana = st.number_input("Horas totais no ciclo:", 5, 100, 25)
-        st.caption("Ajuste os Pesos e Níveis nos cards abaixo para calcular sua meta ideal.")
+        st.caption("Ajuste os Pesos (importância) e Níveis (sua base) para equilibrar o ciclo.")
 
-    # 3. Cards de Ajuste (Peso/Nível) e Cálculo de Horas
-    dados_para_calculo = []
+    # 2. Captura de Dados Otimizada (Cards em Colunas em vez de Expanders)
+    dados_ciclo = []
     st.write("---")
-    st.subheader("⚖️ Ajuste de Pesos e Níveis")
     cols_ajuste = st.columns(3)
     
     for i, m in enumerate(materias_list):
         with cols_ajuste[i % 3]:
-            st.markdown(f"""
-                <div style="background:#3a3b3c; padding:8px; border-radius:10px; border-top:4px solid #3ec6a8; text-align:center;">
-                    <b style="color:white; font-size:14px;">{m}</b>
-                </div>
-            """, unsafe_allow_html=True)
-            
-            p = st.number_input("Peso", 1, 5, 3, key=f"p_ciclo_{m}")
-            n = st.number_input("Nível", 1, 5, 3, key=f"n_ciclo_{m}")
+            st.markdown(f'<div style="background:#3a3b3c; padding:8px; border-radius:10px; border-top:4px solid #3ec6a8; text-align:center; margin-bottom:5px;"><b style="color:#3ec6a8; font-size:13px;">{m}</b></div>', unsafe_allow_html=True)
+            p = st.select_slider("Peso", [1,2,3,4,5], 3, key=f"p_{m}")
+            n = st.select_slider("Nível", [1,2,3,4,5], 3, key=f"n_{m}")
+            g = st.number_input("Meta Giros", 1, 14, 1, key=f"g_{m}")
             
             fator = p/n
-            dados_para_calculo.append({"materia": m, "fator": fator, "peso": p, "nivel": n})
+            dados_ciclo.append({"materia": m, "fator": fator, "peso": p, "nivel": n, "giros": g})
 
-    # Processamento das Metas
-    df_metas = pd.DataFrame(dados_para_calculo)
-    if not df_metas.empty:
-        soma_f = df_metas["fator"].sum()
-        df_metas["horas_sug"] = (df_metas["fator"] / soma_f) * horas_semana if soma_f > 0 else 0
+    # 3. Processamento e Gráfico de Pizza Pastel
+    df_c = pd.DataFrame(dados_ciclo)
+    if not df_c.empty:
+        df_c["horas"] = (df_c["fator"] / df_c["fator"].sum()) * horas_semana
         
-        # Gráfico de Pizza no Topo
         with col_topo2:
-            fig_p = px.pie(df_metas, values='horas_sug', names='materia', hole=0.4, 
-                           color_discrete_sequence=px.colors.qualitative.Pastel)
-            fig_p.update_layout(showlegend=False, margin=dict(l=0, r=0, t=0, b=0), paper_bgcolor='rgba(0,0,0,0)', font=dict(color="white"))
-            st.plotly_chart(fig_p, use_container_width=True)
+            # Lista expandida de cores pastel
+            base_cores = ['#FFB7B2', '#FFDAC1', '#E2F0CB', '#B5EAD7', '#C7CEEA', '#F3D1F4', '#F9FFB2', '#B2E2F2', '#D1F2B2', '#F2B2B2']
+            
+            # Garante que a lista de cores seja grande o suficiente repetindo a base
+            cores_expandidas = (base_cores * (len(df_c) // len(base_cores) + 1))[:len(df_c)]
+            
+            fig_p = px.pie(
+                df_c, 
+                values='horas', 
+                names='materia', 
+                hole=0.4, 
+                color_discrete_sequence=cores_expandidas
+            )
+            
+            fig_p.update_traces(
+                textinfo='label+percent', 
+                textposition='inside',
+                marker=dict(line=dict(color='#202225', width=2))
+            )
+            
+            fig_p.update_layout(
+                showlegend=False, 
+                margin=dict(l=0, r=0, t=0, b=0), 
+                paper_bgcolor='rgba(0,0,0,0)', 
+                font=dict(size=12, color="white")
+            )
+            st.plotly_chart(fig_p, use_container_width=True, config={'staticPlot': True})
 
-    st.divider()
+        # 4. Exibição dos Cards de Carga Horária
+        st.subheader("Distribuição da Carga Horária")
+        cols_res = st.columns(4)
+        for i, r in df_c.iterrows():
+            with cols_res[i % 4]:
+                st.markdown(f"""
+                    <div style="background:#2b2d2e; padding:10px; border-radius:8px; border-left:5px solid #3ec6a8; margin-bottom:10px;">
+                        <div style="font-size:11px; color:#b0b3b8;">{r['materia']}</div>
+                        <div style="font-size:18px; font-weight:bold; color:#ffffff;">{decimal_para_horas(r['horas'])}</div>
+                        <div style="font-size:10px; color:gray;">P{r['peso']} | N{r['nivel']} | G{r['giros']}</div>
+                    </div>
+                """, unsafe_allow_html=True)
 
-    # --- 4. EXIBIÇÃO DA META DENTRO DO CARD (Conforme sua solicitação anterior) ---
-    st.subheader("⏱️ Metas Calculadas por Disciplina")
-    res_cols = st.columns(3)
-    for idx, row in df_metas.iterrows():
-        tempo_fmt = decimal_para_horas(row["horas_sug"])
-        with res_cols[idx % 3]:
-            st.markdown(f"""
-                <div style="background: #202225; border: 1px solid #3ec6a8; padding: 15px; border-radius: 10px; text-align: center; margin-bottom: 20px;">
-                    <b style="color:white; font-size: 15px;">{row['materia']}</b><br>
-                    <span style="color:#3ec6a8; font-size: 22px; font-weight: bold;">{tempo_fmt}</span><br>
-                    <small style="color:gray;">Meta Semanal Recomendada</small>
-                </div>
-            """, unsafe_allow_html=True)
+        st.divider()
+        st.subheader("🗓️ Ordem do Ciclo (Editável)")
+        st.markdown("Dê um clique duplo para editar a **Disciplina, o Nº do Giro ou o Tempo** antes de salvar!")
 
-    st.divider()
-
-    # --- 5. A PLANILHA DE 7 DIAS (IGUAL À DA GESTÃO) ---
-    st.subheader("🗓️ Cronograma de Execução (Fila de Estudos)")
-    st.info("Distribua as matérias abaixo seguindo a numeração de 01 a 07.")
-
-    # Garante que a estrutura Dia 01 a 07 exista
-    if df_cronograma.empty or "Disciplina 01" not in df_cronograma.columns:
-        dias_sequencia = [f"Dia {i:02d}" for i in range(1, 8)]
-        df_cronograma = pd.DataFrame({
-            "Ordem": dias_sequencia,
-            "Disciplina 01": ["-"] * 7, "Tempo D1 (min)": [60] * 7,
-            "Giros": [1] * 7,
-            "Disciplina 02": ["-"] * 7, "Tempo D2 (min)": [60] * 7,
-            "Disciplina 03": ["-"] * 7, "Tempo D3 (min)": [0] * 7,
-            "Total Dia (min)": [120] * 7
-        })
-
-    config_crono = {
-        "Ordem": st.column_config.TextColumn("Sequência", disabled=True),
-        "Disciplina 01": st.column_config.SelectboxColumn("Matéria 01", options=materias_list),
-        "Giros": st.column_config.NumberColumn("🌀 Giro", min_value=1),
-        "Disciplina 02": st.column_config.SelectboxColumn("Matéria 02", options=materias_list),
-        "Disciplina 03": st.column_config.SelectboxColumn("Matéria 03", options=materias_list),
-        "Total Dia (min)": st.column_config.NumberColumn("Soma Total", disabled=True)
-    }
-
-    ed_ciclo_vinal = st.data_editor(
-        df_cronograma,
-        num_rows="fixed",
-        use_container_width=True,
-        hide_index=True,
-        column_config=config_crono,
-        key="editor_ciclo_estudos_page"
-    )
-
-    if st.button("💾 Salvar e Aplicar Ciclo", type="primary", use_container_width=True):
-        # Calcula totais
-        ed_ciclo_vinal["Total Dia (min)"] = (
-            ed_ciclo_vinal["Tempo D1 (min)"].fillna(0) + 
-            ed_ciclo_vinal["Tempo D2 (min)"].fillna(0) + 
-            ed_ciclo_vinal["Tempo D3 (min)"].fillna(0)
+        # 5. Gerando a ordem sugerida dinamicamente
+        blocos = []
+        ordem_idx = 1
+        max_giros = int(df_c["giros"].max())
+        
+        for giro_num in range(1, max_giros + 1):
+            df_g = df_c[df_c["giros"] >= giro_num].sort_values("horas", ascending=False)
+            for _, r in df_g.iterrows():
+                tempo_bloco = r["horas"] / r["giros"]
+                blocos.append({
+                    "Ordem": ordem_idx,
+                    "Disciplina": r["materia"],
+                    "Giro": giro_num,
+                    "Tempo": decimal_para_horas(tempo_bloco)
+                })
+                ordem_idx += 1
+        
+        df_sugestao = pd.DataFrame(blocos)
+        
+        # 6. Tabela Editável e Botão Salvar
+        ed_crono = st.data_editor(
+            df_sugestao,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "Ordem": st.column_config.NumberColumn("Fila", disabled=True),
+                "Disciplina": st.column_config.SelectboxColumn("Disciplina", options=materias_list),
+                "Giro": st.column_config.NumberColumn("Nº do Giro", min_value=1, max_value=20),
+                "Tempo": st.column_config.TextColumn("Tempo do Bloco")
+            },
+            key="ed_ordem_ciclo"
         )
-        st.cache_data.clear()
-        overwrite_data("cronograma", ed_ciclo_vinal)
-        st.success("✅ Ciclo salvo e sincronizado com a Gestão de Dados!")
-        st.balloons()
-        st.rerun()
+        
+        if st.button("Salvar Meu Ciclo", type="primary"):
+            overwrite_data("cronograma", ed_crono)
+            st.success("Ciclo salvo com sucesso!")
+            st.rerun()
 
 elif page == "Gestão de Dados":
     st.title("⚙️ Painel de Controle")
     t1, t2, t3, t4 = st.tabs(["🗓️ Editar Cronograma", "📚 Matérias", "📝 Histórico", "❌ Erros"])
     
     with t1:
-        st.markdown("### 🗓️ Configuração do Ciclo de 7 Dias")
-        st.info("Defina as metas para cada dia do seu ciclo (01 a 07). As alterações refletem no cálculo do 'Ciclo de Estudos'.")
+        st.markdown("### 🗓️ Personalize sua semana de estudos")
+        st.info("As alterações feitas aqui aparecerão na aba 'Ciclo de Estudos'.")
         
-        # 1. ESTRUTURA SEQUENCIAL (Dia 01 ao 07)
-        dias_ciclo = [f"Dia {i:02d}" for i in range(1, 8)]
-        
-        # Se a planilha estiver vazia ou com estrutura antiga, reinicia com as novas colunas
-        if df_cronograma.empty or "Disciplina 01" not in df_cronograma.columns:
-            df_cronograma = pd.DataFrame({
-                "Ordem": dias_ciclo,
-                "Disciplina 01": ["-"] * 7,
-                "Tempo D1 (min)": [60] * 7,
-                "Giros": [1] * 7, # Giro posicionado no meio
-                "Disciplina 02": ["-"] * 7,
-                "Tempo D2 (min)": [60] * 7,
-                "Disciplina 03": ["-"] * 7, # Terceira disciplina opcional
-                "Tempo D3 (min)": [0] * 7,
-                "Total Dia (min)": [120] * 7
-            })
+        # Se o cronograma estiver vazio, cria um modelo inicial
+        if df_cronograma.empty:
+            df_cronograma = pd.DataFrame([
+                {"Dia": "Segunda", "Materia 1": "-", "Tempo (min)": 60, "Materia 2": "-", "Tempo 2 (min)": 60},
+                {"Dia": "Terça", "Materia 1": "-", "Tempo (min)": 60, "Materia 2": "-", "Tempo 2 (min)": 60}
+            ])
 
-        # 2. CONFIGURAÇÃO VISUAL DAS COLUNAS
-        # Usamos os nomes das matérias que você já cadastrou para o seletor
-        config_colunas = {
-            "Ordem": st.column_config.TextColumn("Sequência", disabled=True),
-            "Disciplina 01": st.column_config.SelectboxColumn("Materia 01", options=materias_list, width="medium"),
-            "Tempo D1 (min)": st.column_config.NumberColumn("Minutos D1", min_value=0, step=5),
-            "Giros": st.column_config.NumberColumn("🌀 Giro", min_value=1, max_value=10, help="Número de giros no ciclo"),
-            "Disciplina 02": st.column_config.SelectboxColumn("Materia 02", options=materias_list, width="medium"),
-            "Tempo D2 (min)": st.column_config.NumberColumn("Minutos D2", min_value=0, step=5),
-            "Disciplina 03": st.column_config.SelectboxColumn("Materia 03", options=materias_list, width="medium"),
-            "Tempo D3 (min)": st.column_config.NumberColumn("Minutos D3", min_value=0, step=5),
-            "Total Dia (min)": st.column_config.NumberColumn("Soma Total", disabled=True)
-        }
-
-        # 3. EDITOR DE TABELA
-        ed_crono = st.data_editor(
-            df_cronograma, 
-            num_rows="fixed", # Mantém sempre os 7 dias
-            key="ed_crono_ciclico", 
-            use_container_width=True, 
-            hide_index=True,
-            column_config=config_colunas
-        )
+        ed_crono = st.data_editor(df_cronograma, num_rows="dynamic", key="ed_crono", use_container_width=True, hide_index=True)
         
-        # 4. SALVAMENTO E CÁLCULO
-        if st.button("Salvar Planejamento de 7 Dias", type="primary", use_container_width=True):
-            # Calcula o total de minutos do dia somando as 3 colunas de tempo
-            ed_crono["Total Dia (min)"] = (
-                ed_crono["Tempo D1 (min)"].fillna(0) + 
-                ed_crono["Tempo D2 (min)"].fillna(0) + 
-                ed_crono["Tempo D3 (min)"].fillna(0)
-            )
-            
-            # Limpa cache para atualizar as outras páginas instantaneamente
-            st.cache_data.clear() 
-            
-            # Grava na aba 'cronograma' do Google Sheets
+        if st.button("Salvar Cronograma", type="primary"):
+            # O comando abaixo limpa o cache ANTES de salvar para garantir a atualização
+            st.cache_data.clear()
             overwrite_data("cronograma", ed_crono)
-            
-            st.success("✅ Ciclo de 7 dias salvo com sucesso!")
+            st.success("Cronograma vinculado com sucesso!")
             st.rerun()
 
     with t2:
-        st.markdown("### 📚 Gerenciar Disciplinas")
-        
-        # --- ADICIONAR NOVA MATÉRIA ---
-        with st.expander("➕ Adicionar Nova Disciplina", expanded=True):
-            nova = st.text_input("Nome da Matéria")
-            if st.button("Confirmar Adição"):
-                if nova and nova not in materias_list:
-                    nova_lista = ",".join(materias_list + [nova])
-                    overwrite_data("config", pd.DataFrame([{"materias": nova_lista}]))
-                    st.success(f"✅ {nova} adicionada com sucesso!")
-                    st.rerun()
-                elif nova in materias_list:
-                    st.warning("Esta matéria já está cadastrada.")
-                else:
-                    st.error("Digite um nome válido.")
-
-        st.divider()
-
-        # --- EXCLUIR MATÉRIA EXISTENTE ---
-        with st.expander("🗑️ Excluir Disciplina"):
-            if materias_list:
-                materia_para_excluir = st.selectbox("Selecione a matéria para remover:", materias_list)
-                
-                st.warning(f"Atenção: Excluir '{materia_para_excluir}' não apagará seu histórico de estudos, mas ela não aparecerá mais nos novos registros ou ciclos.")
-                
-                if st.button("🚨 Excluir Definitivamente", type="secondary"):
-                    # Filtra a lista removendo a matéria selecionada
-                    nova_lista_materias = [m for m in materias_list if m != materia_para_excluir]
-                    nova_string = ",".join(nova_lista_materias)
-                    
-                    overwrite_data("config", pd.DataFrame([{"materias": nova_string}]))
-                    st.success(f"❌ {materia_para_excluir} removida!")
-                    st.rerun()
-            else:
-                st.info("Nenhuma matéria cadastrada para excluir.")
+        nova = st.text_input("Nova Matéria")
+        if st.button("Adicionar Disciplina"):
+            nova_lista = ",".join(materias_list + [nova])
+            overwrite_data("config", pd.DataFrame([{"materias": nova_lista}]))
+            st.success(f"{nova} adicionada!")
+            st.rerun()
             
     with t3:
         st.markdown("### Editar Histórico de Sessões")
