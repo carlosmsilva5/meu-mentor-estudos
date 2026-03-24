@@ -545,47 +545,42 @@ elif page == "Gestão de Dados":
 
     with t2:
         st.markdown("### 📚 Gerenciar Disciplinas")
-        st.info("Aqui você pode adicionar, editar o nome ou excluir disciplinas do seu app.")
-
-        # 1. Busca a lista atual de matérias da aba 'materias'
+        
+        # 1. BUSCA REAL: Tenta ler a aba 'materias' do seu Google Sheets
         try:
-            # Lendo a aba de matérias (certifique-se que o nome na planilha é 'materias')
-            df_materias_gestao = conn.read(worksheet="materias")
-        except:
-            df_materias_gestao = pd.DataFrame(columns=["materia"])
+            # Forçamos a conexão a ler a aba específica de matérias
+            df_materias_existentes = conn.read(worksheet="materias").dropna(how='all')
+            
+            # Se a coluna não existir ou o DF estiver vazio, criamos um padrão
+            if df_materias_existentes.empty or 'materia' not in df_materias_existentes.columns:
+                df_materias_existentes = pd.DataFrame(columns=["materia"])
+        except Exception as e:
+            st.error(f"Erro ao acessar a aba 'materias': {e}")
+            df_materias_existentes = pd.DataFrame(columns=["materia"])
 
-        # 2. Editor de Tabela (Permite editar o nome clicando na célula ou excluir a linha)
-        st.write("Dica: Para excluir, selecione a linha e aperte 'Delete' no teclado ou use o ícone de lixeira.")
+        st.info("Abaixo você pode editar nomes, excluir linhas ou adicionar novas disciplinas na última linha.")
+        
+        # 2. O EDITOR DE TABELA: Agora ele usa o DataFrame que acabou de ler
         ed_materias = st.data_editor(
-            df_materias_gestao, 
-            num_rows="dynamic", # Permite adicionar e excluir linhas
-            key="ed_materias_btn", 
+            df_materias_existentes, 
+            num_rows="dynamic", # Isso permite que você delete e adicione linhas livremente
+            key="editor_gestao_materias", 
             use_container_width=True,
             hide_index=True,
             column_config={
-                "materia": st.column_config.TextColumn("Nome da Disciplina", help="Clique para editar o nome")
+                "materia": st.column_config.TextColumn("Nome da Disciplina", required=True)
             }
         )
 
-        # 3. Botão para Salvar as Alterações
-        if st.button("Salvar Alterações de Disciplinas", type="primary"):
-            # Limpa o cache para que o Ciclo de Estudos e o Registro leiam os novos nomes
-            st.cache_data.clear()
-            overwrite_data("materias", ed_materias)
-            st.success("Lista de disciplinas atualizada com sucesso!")
-            st.rerun()
-
-        st.divider()
-        
-        # 4. Formulário rápido para adicionar (opcional, já que o editor acima faz isso)
-        with st.expander("➕ Adição Rápida"):
-            nova_m = st.text_input("Nome da nova disciplina", key="input_nova_m")
-            if st.button("Adicionar"):
-                if nova_m:
-                    novo_df = pd.concat([df_materias_gestao, pd.DataFrame([{"materia": nova_m}])], ignore_index=True)
-                    overwrite_data("materias", novo_df)
-                    st.success(f"{nova_m} adicionada!")
-                    st.rerun()
+        # 3. SALVAMENTO: Sobrescreve a aba 'materias' com o que está na tela
+        if st.button("💾 Salvar Alterações", type="primary"):
+            try:
+                st.cache_data.clear() # Limpa o cache para o resto do app atualizar
+                overwrite_data("materias", ed_materias)
+                st.success("Lista de disciplinas atualizada com sucesso!")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Erro ao salvar: {e}")
             
     with t3:
         st.markdown("### Editar Histórico de Sessões")
