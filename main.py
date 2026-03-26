@@ -15,33 +15,27 @@ st.markdown("""
     .card { background: #3a3b3c; padding: 18px; border-radius: 10px; margin-bottom: 12px; border: 1px solid #4f4f4f; text-align: center; }
     .title { font-size: 14px; color: #b0b3b8; font-weight: bold; text-transform: uppercase; }
     .value { font-size: 28px; font-weight: bold; color: #ffffff; }
+    .ciclo-card { background: #3a3b3c; border: 1px solid #4f4f4f; padding: 15px; border-radius: 10px; text-align: center; border-top: 4px solid #3ec6a8; }
+    .cronograma-table { width: 100%; border-collapse: collapse; background: #3a3b3c; border-radius: 8px; overflow: hidden; margin-top: 15px; }
+    .cronograma-table td, .cronograma-table th { padding: 12px; border: 1px solid #4f4f4f; text-align: left; }
+    .cronograma-table th { background: #202225; color: #3ec6a8; }
+    .dia-num { background: #4e1d3d; color: white; font-weight: bold; text-align: center !important; width: 45px; }
     .giro-badge { background: #3ec6a8; color: #202225; padding: 5px 15px; border-radius: 20px; font-weight: bold; font-size: 18px; display: inline-block; margin-bottom: 15px;}
 </style>
 """, unsafe_allow_html=True)
 
 # ---------------- FUNÇÕES ----------------
-conn = st.connection("gsheets", type=GSheetsConnection)
-
-@st.cache_data(ttl=2)
-def load_data(sheet):
-    try:
-        df = conn.read(worksheet=sheet).dropna(how='all')
-        df.columns = [str(c).strip().lower() for c in df.columns] 
-        return df
-    except: return pd.DataFrame()
-
 def save_data(sheet, df_new):
     try:
+        # Carrega o que já existe na planilha
         df_atual = conn.read(worksheet=sheet).dropna(how='all')
+        # Junta com o novo registro
         df_novo = pd.concat([df_atual, df_new], ignore_index=True)
+        # Atualiza a planilha no Google Sheets
         conn.update(worksheet=sheet, data=df_novo)
         st.cache_data.clear()
     except Exception as e:
         st.error(f"Erro ao salvar dados: {e}")
-
-def overwrite_data(sheet, df_full):
-    conn.update(worksheet=sheet, data=df_full)
-    st.cache_data.clear()
 
 def formatar_tempo(minutos):
     if pd.isna(minutos) or minutos < 0: return "0min"
@@ -52,14 +46,31 @@ def formatar_tempo(minutos):
 def decimal_para_horas(horas_decimais):
     return formatar_tempo(horas_decimais * 60)
 
+def append_data(worksheet_name, data_dict):
+    """Função para adicionar uma nova linha na planilha Google"""
+    try:
+        # Tenta ler os dados existentes
+        df_existente = conn.read(worksheet=worksheet_name)
+        # Cria um DataFrame com a nova linha
+        df_novo = pd.DataFrame([data_dict])
+        # Junta o antigo com o novo
+        df_final = pd.concat([df_existente, df_novo], ignore_index=True)
+        # Atualiza a planilha inteira
+        conn.update(worksheet=worksheet_name, data=df_final)
+    except Exception as e:
+        st.error(f"Erro na função append_data: {e}")
+        
 def calcular_streak(df):
     if df.empty or 'data' not in df.columns: return 0
     df['data_fmt'] = pd.to_datetime(df['data'], format='%d/%m/%Y', errors='coerce')
     datas_estudadas = df['data_fmt'].dropna().dt.date.sort_values(ascending=False).unique()
+    
     if len(datas_estudadas) == 0: return 0
+    
     hoje = datetime.now().date()
     streak = 0
     if (hoje - datas_estudadas[0]).days > 1: return 0
+        
     data_atual = datas_estudadas[0]
     for data in datas_estudadas:
         if (data_atual - data).days <= 1:
@@ -68,108 +79,282 @@ def calcular_streak(df):
         else: break
     return streak
 
+def calcular_giro_atual(df):
+    """Calcula em qual semana (Giro) o aluno está baseado no primeiro registro de estudo"""
+    if df.empty or 'data' not in df.columns: return 1
+    df['data_fmt'] = pd.to_datetime(df['data'], format='%d/%m/%Y', errors='coerce')
+    primeiro_dia = df['data_fmt'].min()
+    if pd.isna(primeiro_dia): return 1
+    
+    hoje = pd.Timestamp.today().normalize()
+    dias_passados = (hoje - primeiro_dia).days
+    giro = (dias_passados // 7) + 1
+    return max(1, giro)
+
+conn = st.connection("gsheets", type=GSheetsConnection)
+
+@st.cache_data(ttl=2)
+def load_data(sheet):
+    try:
+        df = conn.read(worksheet=sheet).dropna(how='all')
+        df.columns = [str(c).strip().lower() for c in df.columns] 
+        return df
+    except: return pd.DataFrame()
+
+def overwrite_data(sheet, df_full):
+    conn.update(worksheet=sheet, data=df_full)
+    st.cache_data.clear()
+
 # ---------------- CARREGAMENTO ----------------
 df_estudo = load_data("progresso")
 df_erros = load_data("caderno_erros")
 df_config = load_data("config")
 df_cronograma = load_data("cronograma")
 
-materias_list = str(df_config["materias"].iloc[0]).split(",") if not df_config.empty else ["Português", "Direito"]
+# Se o cronograma estiver vazio (primeiro acesso), cria uma estrutura padrão
+if df_cronograma.empty:
+    df_cronograma = pd.DataFrame({
+        "dia": [1, 2, 3, 4, 5, 6, 7],
+        "materia_1": ["Português", "Dir. Constitucional", "Dir. Administrativo", "Português", "Dir. Constitucional", "Revisão Geral", "Simulado"],
+        "materia_2": ["Raciocínio Lógico", "Informática", "Redação", "Raciocínio Lógico", "Informática", "Discursiva", "-"],
+        "materia_3": ["-", "-", "-", "-", "-", "-", "-"]
+    })
+    overwrite_data("cronograma", df_cronograma)
+
+materias_list = str(df_config["materias"].iloc[0]).split(",") if not df_config.empty and "materias" in df_config.columns else ["Português", "Direito Constitucional", "Direito Administrativo"]
 
 # ---------------- SIDEBAR ----------------
 with st.sidebar:
     st.title("📘 Mentor Elite")
-    selection = st.radio("", ["🏠 Dashboard", "⏱️ Registrar", "❌ Caderno de Erros", "🎯 Ciclo de Estudos", "⚙️ Gestão de Dados"])
+    menu_map = {
+        "🏠 Dashboard": "Home",
+        "⏱️ Registrar": "Registrar Estudo",
+        "❌ Caderno de Erros": "Caderno de Erros",
+        "🎯 Ciclo de Estudos": "Ciclo de Estudos",
+        "⚙️ Gestão de Dados": "Gestão de Dados"
+    }
+    selection = st.radio("", list(menu_map.keys()))
+    page = menu_map[selection]
 
 # ---------------- PÁGINAS ----------------
-if selection == "🏠 Dashboard":
+if page == "Home":
     st.title("Visão Geral")
     
-    # Cálculos de Topo
+    # 1. Cálculos de Topo
+    if not df_estudo.empty:
+        df_estudo['tempo_num'] = pd.to_numeric(df_estudo['tempo'], errors='coerce').fillna(0)
+        df_estudo['acertos_num'] = pd.to_numeric(df_estudo['acertos'], errors='coerce').fillna(0)
+        df_estudo['total_q_num'] = pd.to_numeric(df_estudo['total_q'], errors='coerce').fillna(0)
+        # Garante que as novas colunas existam (blindagem)
+        for col in ['paginas', 'humor', 'tipo_estudo']:
+            if col not in df_estudo.columns:
+                df_estudo[col] = 0 if col == 'paginas' else "N/A"
+        df_estudo['paginas_num'] = pd.to_numeric(df_estudo['paginas'], errors='coerce').fillna(0)
+
     t_min = pd.to_numeric(df_estudo['tempo'], errors='coerce').sum() if not df_estudo.empty else 0
     q_tot = pd.to_numeric(df_estudo['total_q'], errors='coerce').sum() if not df_estudo.empty else 0
     q_acc = pd.to_numeric(df_estudo['acertos'], errors='coerce').sum() if not df_estudo.empty else 0
     aproveitamento = (q_acc / q_tot * 100) if q_tot > 0 else 0
     streak_atual = calcular_streak(df_estudo)
-    
-    # Lógica para pegar o último dia do cronograma estudado
-    ultimo_dia_crono = "N/A"
-    if not df_estudo.empty and 'dia_cronograma' in df_estudo.columns:
-        valid_days = df_estudo['dia_cronograma'].dropna()
-        if not valid_days.empty:
-            ultimo_dia_crono = f"Dia {int(valid_days.iloc[-1])}"
 
-    c1, c2, c3, c4, c5 = st.columns(5)
+    c1, c2, c3, c4 = st.columns(4)
     with c1: st.markdown(f'<div class="card"><div class="title">Tempo Total</div><div class="value">{formatar_tempo(t_min)}</div></div>', unsafe_allow_html=True)
-    with c2: st.markdown(f'<div class="card"><div class="title">Taxa Acertos</div><div class="value">{aproveitamento:.1f}%</div></div>', unsafe_allow_html=True)
-    with c3: st.markdown(f'<div class="card"><div class="title">Ofensiva</div><div class="value">🔥 {streak_atual}d</div></div>', unsafe_allow_html=True)
-    with c4: st.markdown(f'<div class="card"><div class="title">Questões</div><div class="value">{int(q_tot)}</div></div>', unsafe_allow_html=True)
-    with c5: st.markdown(f'<div class="card" style="border-top: 4px solid #3ec6a8;"><div class="title">Último Dia Lindo</div><div class="value">📍 {ultimo_dia_crono}</div></div>', unsafe_allow_html=True)
-
-    # Gráficos (Resumido para o exemplo)
-    if not df_estudo.empty:
-        col_g1, col_g2 = st.columns(2)
-        with col_g1:
-            st.subheader("Performance por Matéria")
-            df_estudo['tempo_num'] = pd.to_numeric(df_estudo['tempo'], errors='coerce').fillna(0)
-            fig = px.bar(df_estudo.groupby("materia")["tempo_num"].sum().reset_index(), x="materia", y="tempo_num", color_discrete_sequence=['#3ec6a8'])
-            st.plotly_chart(fig, use_container_width=True)
-        with col_g2:
-            st.subheader("Evolução")
-            st.line_chart(df_estudo.groupby("data")["tempo"].sum())
+    with c2: st.markdown(f'<div class="card"><div class="title">Taxa de Acertos</div><div class="value">{aproveitamento:.1f}%</div></div>', unsafe_allow_html=True)
+    with c3: st.markdown(f'<div class="card"><div class="title">Ofensiva (Streak)</div><div class="value">🔥 {streak_atual} Dias</div></div>', unsafe_allow_html=True)
+    with c4: st.markdown(f'<div class="card"><div class="title">Questões Feitas</div><div class="value">{int(q_tot)}</div></div>', unsafe_allow_html=True)
 
     st.divider()
-    # --- NOVO: CRONOGRAMA APARECENDO NO DASHBOARD ---
-    st.subheader("🗓️ Seu Cronograma Salvo")
-    if not df_cronograma.empty:
-        html_tabela = """<table style="width:100%; border-collapse: collapse; background-color: #3a3b3c; color: white; border-radius: 10px; overflow: hidden; border: 1px solid #4f4f4f;"><thead><tr style="background-color: #202225; color: #3ec6a8; text-align: left;"><th style="padding: 12px;">Sequência</th><th>Matéria 01</th><th style="text-align: center;">🌀 Giro</th><th>Matéria 02</th><th>Matéria 03</th><th style="text-align: center;">Total Dia</th></tr></thead><tbody>"""
-        for _, row in df_cronograma.iterrows():
-            html_tabela += f"""<tr style="border-bottom: 1px solid #4f4f4f;"><td style="padding: 10px; font-weight: bold; background: #2b2d2e; text-align: center;">{row.get('ordem',row.get('dia','-'))}</td><td>{row.get('disciplina 01','-')}</td><td style="text-align: center;">{row.get('giros', 1)}</td><td>{row.get('disciplina 02','-')}</td><td>{row.get('disciplina 03','-')}</td><td style="color: #3ec6a8; text-align: center;">{row.get('total dia (h)', 0)}h</td></tr>"""
-        st.markdown(html_tabela + "</tbody></table>", unsafe_allow_html=True)
-    else:
-        st.info("Configure seu cronograma na aba Ciclo de Estudos.")
 
-elif selection == "⏱️ Registrar":
-    st.title("🧮 Novo Registro de Estudo")
+    if not df_estudo.empty:
+        col_grafico1, col_grafico2 = st.columns(2)
+        
+        with col_grafico1:
+            st.subheader("Desempenho por Disciplina")
+            
+            # Agrupamento Principal
+            painel_disc = df_estudo.groupby("materia").agg(
+                tempo_total=("tempo_num", "sum"),
+                q_total=("total_q_num", "sum"),
+                q_acertos=("acertos_num", "sum"),
+                total_pag=("paginas_num", "sum")
+            ).reset_index()
+
+            # Humor Predominante
+            humor_map = df_estudo.groupby("materia")['humor'].agg(lambda x: x.mode()[0] if not x.mode().empty else "N/A").reset_index()
+            painel_disc = pd.merge(painel_disc, humor_map, on="materia", how="left")
+            
+            # Divisão de Tempo por Tipo
+            df_tipos = df_estudo.groupby(["materia", "tipo_estudo"])["tempo_num"].sum().unstack(fill_value=0).reset_index()
+            for t in ["Teoria Novo", "Revisão", "Questões"]:
+                if t not in df_tipos.columns: df_tipos[t] = 0
+            
+            painel_completo = pd.merge(painel_disc, df_tipos, on="materia", how="left")
+            
+            # --- RECUPERAÇÃO DO GRÁFICO RADAR (ESTILO PREMIUM MANTIDO) ---
+            painel_completo["aproveitamento"] = (painel_completo["q_acertos"] / painel_completo["q_total"] * 100).fillna(0)
+            
+            # 1. Definir a cor dinâmica baseada na média de aproveitamento
+            media_aprov = painel_completo["aproveitamento"].mean()
+            if media_aprov >= 90: cor_radar = "#2ecc71"    # Verde
+            elif media_aprov >= 80: cor_radar = "#f1c40f"  # Amarelo
+            elif media_aprov >= 70: cor_radar = "#e67e22"  # Laranja
+            else: cor_radar = "#e74c3c"                    # Vermelho
+
+            # 2. Criar o gráfico com a cor definida
+            fig_radar = px.line_polar(
+                painel_completo, 
+                r='aproveitamento', 
+                theta='materia', 
+                line_close=True,
+                markers=True,
+                color_discrete_sequence=[cor_radar]
+            )
+            
+            # Preenche a área com a cor dinâmica e transparência (0.3)
+            fig_radar.update_traces(fill='toself', fillcolor=cor_radar, opacity=0.3)
+
+            fig_radar.update_layout(
+                polar=dict(
+                    bgcolor='rgba(0,0,0,0)', 
+                    radialaxis=dict(
+                        visible=True, 
+                        range=[0, 100], 
+                        color='white', 
+                        gridcolor='#4f4f4f',
+                        showticklabels=False  # <--- ISSO REMOVE OS NÚMEROS INTERNOS
+                    ),
+                    angularaxis=dict(color='white', gridcolor='#4f4f4f')
+                ),
+                paper_bgcolor='rgba(0,0,0,0)', 
+                plot_bgcolor='rgba(0,0,0,0)', 
+                font=dict(color='white'),
+                margin=dict(l=40, r=40, t=20, b=20)
+            )
+            st.plotly_chart(fig_radar, use_container_width=True, config={'staticPlot': True})
+            # -------------------------------------------------------------
+            
+            # --- TABELA DE DETALHAMENTO ATUALIZADA ---
+            st.markdown("#### Detalhamento das Matérias")
+            tab_v = painel_completo.copy()
+            
+            # Formatação de Tempos
+            tab_v["Total"] = tab_v["tempo_total"].apply(formatar_tempo)
+            tab_v["Teoria"] = tab_v["Teoria Novo"].apply(formatar_tempo)
+            tab_v["Rev."] = tab_v["Revisão"].apply(formatar_tempo)
+            tab_v["Ques. (Tempo)"] = tab_v["Questões"].apply(formatar_tempo)
+            
+            # Formatação de Performance
+            tab_v["Aprov."] = tab_v["aproveitamento"].map("{:.1f}%".format)
+            
+            # Seleção das Colunas (Incluindo o número de questões 'q_total')
+            cols_final = [
+                "materia", "Total", "Teoria", "Rev.", 
+                "Ques. (Tempo)", "q_total", "total_pag", "humor", "Aprov."
+            ]
+            
+            # Renomeação para exibição limpa
+            st.dataframe(
+                tab_v[cols_final].rename(columns={
+                    "materia": "Matéria", 
+                    "q_total": "Nº Quest.", 
+                    "total_pag": "Págs", 
+                    "humor": "Humor"
+                }), 
+                use_container_width=True, 
+                hide_index=True
+            )
+
+        with col_grafico2:
+            # 1. Preparação dos Dados (7 dias)
+            hoje = pd.Timestamp.today().normalize()
+            df_dias = pd.DataFrame({'data': pd.date_range(end=hoje, periods=7)})
+            df_estudo['data_fmt'] = pd.to_datetime(df_estudo['data'], format='%d/%m/%Y', errors='coerce')
+            
+            est_agrup = df_estudo.groupby('data_fmt').agg({
+                "tempo_num": "sum",
+                "acertos_num": "sum",
+                "total_q_num": "sum"
+            }).reset_index()
+            
+            evol = pd.merge(df_dias, est_agrup, left_on='data', right_on='data_fmt', how='left').fillna(0)
+            evol['data_label'] = evol['data'].dt.strftime('%d/%m')
+            
+            # --- LÓGICA DE FORMATAÇÃO 00h00min ---
+            def formatar_para_grafico(minutos):
+                h = int(minutos // 60)
+                m = int(minutos % 60)
+                return f"{h:02d}h{m:02d}min"
+
+            evol['tempo_formatado'] = evol['tempo_num'].apply(formatar_para_grafico)
+            evol['horas_decimal'] = (evol['tempo_num'] / 60).round(2)
+            evol['perc_acerto'] = (evol['acertos_num'] / evol['total_q_num'] * 100).fillna(0).round(1)
+            
+            # 2. Gráfico 1: Horas Estudadas (Texto Fixo Formatado)
+            st.subheader("Evolução de Carga Horária (7 Dias)")
+            fig_horas = px.line(evol, x='data_label', y='horas_decimal', markers=True, text='tempo_formatado', color_discrete_sequence=['#3ec6a8'])
+            fig_horas.update_traces(textposition="top center")
+            fig_horas.update_layout(
+                yaxis=dict(rangemode='tozero', gridcolor='#4f4f4f', title="Tempo"), 
+                xaxis=dict(gridcolor='#4f4f4f', title="Data"),
+                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='white'),
+                margin=dict(l=20, r=20, t=30, b=20)
+            )
+            st.plotly_chart(fig_horas, use_container_width=True, config={'staticPlot': True})
+
+            # 3. Gráfico 2: Desempenho Geral (Texto Fixo %)
+            st.subheader("Desempenho Geral (7 Dias)")
+            fig_desempenho = px.line(evol, x='data_label', y='perc_acerto', markers=True, text='perc_acerto', color_discrete_sequence=['#ffffff'])
+            fig_desempenho.update_traces(textposition="top center", texttemplate='%{text}%')
+            fig_desempenho.add_hline(y=90, line_dash="dash", line_color="#4f4f4f", annotation_text="Meta 90%")
+            fig_desempenho.update_layout(
+                yaxis=dict(range=[0, 105], gridcolor='#4f4f4f', title="% Acerto"), 
+                xaxis=dict(gridcolor='#4f4f4f', title="Data"),
+                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='white'),
+                margin=dict(l=20, r=20, t=30, b=20)
+            )
+            st.plotly_chart(fig_desempenho, use_container_width=True, config={'staticPlot': True})
+
+elif page == "Registrar Estudo":
+    st.title("🧮 Novo Registro")
     with st.form("form_registro", clear_on_submit=True):
-        col1, col2, col3 = st.columns(3)
+        col1, col2 = st.columns(2)
         with col1:
             materia = st.selectbox("Matéria", materias_list)
             tipo = st.selectbox("Tipo", ["Teoria Novo", "Revisão", "Questões"])
         with col2:
-            tempo = st.number_input("Tempo (min)", 0)
-            humor = st.selectbox("Humor", ["Focado ⚡", "Neutro 😐", "Cansado 😴"])
-        with col3:
-            # --- NOVO: DIA DO CRONOGRAMA ---
-            dia_crono = st.selectbox("Qual dia do cronograma?", [1,2,3,4,5,6,7], help="Indique qual dia do seu plano você está cumprindo hoje")
+            humor = st.selectbox("Humor/Energia", ["Focado ⚡", "Neutro 😐", "Cansado 😴"])
+            tempo = st.number_input("Tempo total (min)", 0)
         
         st.divider()
-        c_q1, c_q2 = st.columns(2)
-        q_t = c_q1.number_input("Qtd Questões", 0)
-        q_a = c_q2.number_input("Acertos", 0)
-
+        st.markdown("📖 **Leitura de Páginas**")
+        p1, p2 = st.columns(2)
+        p_inicio = p1.number_input("Página Inicial", 0)
+        p_fim = p2.number_input("Página Final", 0)
+        
+        st.divider()
+        st.markdown("📝 **Questões**")
+        cq1, cq2 = st.columns(2)
+        q_t = cq1.number_input("Qtd Questões", 0)
+        q_a = cq2.number_input("Acertos", 0)
+        
         if st.form_submit_button("Salvar Registro"):
+            # Cálculo automático das páginas
+            total_paginas = (p_fim - p_inicio) + 1 if p_fim >= p_inicio and p_fim > 0 else 0
+            
             novo_dado = pd.DataFrame([{
                 "data": datetime.now().strftime("%d/%m/%Y"), 
                 "materia": materia, 
                 "tipo_estudo": tipo, 
+                "humor": humor,
                 "tempo": tempo, 
+                "paginas": total_paginas,
                 "acertos": q_a, 
-                "total_q": q_t,
-                "dia_cronograma": dia_crono, # Salvando o dia
-                "humor": humor
+                "total_q": q_t
             }])
+            
             save_data("progresso", novo_dado)
-            st.success(f"Registro do Dia {dia_crono} salvo com sucesso!")
+            st.success(f"Estudo salvo! {total_paginas} páginas contabilizadas.")
             st.rerun()
-
-# --- MANTIDAS AS OUTRAS PÁGINAS (CICLO, ERROS, GESTÃO) ---
-elif selection == "🎯 Ciclo de Estudos":
-    # (O código original do editor de ciclo que você já tinha)
-    st.title("🎯 Planejamento do Ciclo")
-    # ... (restante do seu código de Ciclo)
-    st.info("Utilize esta página para editar a tabela que aparece no Dashboard.")
-    # Exibir o editor que você já possui no seu script original aqui.
 
 elif page == "Caderno de Erros":
     st.title("❌ Caderno de Erros Estratégico")
