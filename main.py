@@ -317,13 +317,16 @@ if page == "Home":
 elif page == "Registrar Estudo":
     st.title("🧮 Novo Registro")
     with st.form("form_registro", clear_on_submit=True):
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
         with col1:
             materia = st.selectbox("Matéria", materias_list)
             tipo = st.selectbox("Tipo", ["Teoria Novo", "Revisão", "Questões"])
         with col2:
-            humor = st.selectbox("Humor/Energia", ["Focado ⚡", "Neutro 😐", "Cansado 😴"])
             tempo = st.number_input("Tempo total (min)", 0)
+            humor = st.selectbox("Humor/Energia", ["Focado ⚡", "Neutro 😐", "Cansado 😴"])
+        with col3:
+            # NOVO CAMPO: Dia do Cronograma
+            dia_crono = st.selectbox("Dia do Ciclo Estudado", [1, 2, 3, 4, 5, 6, 7], help="Indique qual dia do seu cronograma de 7 dias você está executando agora.")
         
         st.divider()
         st.markdown("📖 **Leitura de Páginas**")
@@ -338,7 +341,6 @@ elif page == "Registrar Estudo":
         q_a = cq2.number_input("Acertos", 0)
         
         if st.form_submit_button("Salvar Registro"):
-            # Cálculo automático das páginas
             total_paginas = (p_fim - p_inicio) + 1 if p_fim >= p_inicio and p_fim > 0 else 0
             
             novo_dado = pd.DataFrame([{
@@ -349,11 +351,12 @@ elif page == "Registrar Estudo":
                 "tempo": tempo, 
                 "paginas": total_paginas,
                 "acertos": q_a, 
-                "total_q": q_t
+                "total_q": q_t,
+                "dia_cronograma": dia_crono # <- Salvando o número do dia
             }])
             
             save_data("progresso", novo_dado)
-            st.success(f"Estudo salvo! {total_paginas} páginas contabilizadas.")
+            st.success(f"Estudo do Dia {dia_crono:02d} salvo! {total_paginas} páginas contabilizadas.")
             st.rerun()
 
 elif page == "Caderno de Erros":
