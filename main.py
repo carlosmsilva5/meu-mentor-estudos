@@ -575,18 +575,38 @@ elif page == "Gestão de Dados":
         st.markdown("### 🗓️ Personalize sua semana de estudos")
         st.info("As alterações feitas aqui aparecerão na aba 'Ciclo de Estudos'.")
         
-        # Se o cronograma estiver vazio, cria um modelo inicial
-        if df_cronograma.empty:
-            df_cronograma = pd.DataFrame([
-                {"Dia": "Segunda", "Materia 1": "-", "Tempo (min)": 60, "Materia 2": "-", "Tempo 2 (min)": 60},
-                {"Dia": "Terça", "Materia 1": "-", "Tempo (min)": 60, "Materia 2": "-", "Tempo 2 (min)": 60}
-            ])
+        # Garante que as colunas da terceira disciplina existam no dataframe para evitar erros
+        for col in ["disciplina 03", "tempo d3 (h)", "giros_3"]:
+            if col not in df_cronograma.columns:
+                df_cronograma[col] = "-" if "disciplina" in col else (1 if "giros" in col else 0.0)
 
-        ed_crono = st.data_editor(df_cronograma, num_rows="dynamic", key="ed_crono", use_container_width=True, hide_index=True)
+        # Configuração para que a edição no painel também tenha os dropdowns
+        config_crono_gestao = {
+            "ordem": st.column_config.TextColumn("Sequência"),
+            "disciplina 01": st.column_config.SelectboxColumn("Materia 01", options=materias_list),
+            "tempo d1 (h)": st.column_config.NumberColumn("H. D1", format="%.2f h"),
+            "giros": st.column_config.NumberColumn("🌀 Giro 1"),
+            "disciplina 02": st.column_config.SelectboxColumn("Materia 02", options=materias_list),
+            "tempo d2 (h)": st.column_config.NumberColumn("H. D2", format="%.2f h"),
+            "giros_2": st.column_config.NumberColumn("🌀 Giro 2"),
+            "disciplina 03": st.column_config.SelectboxColumn("Materia 03", options=materias_list),
+            "tempo d3 (h)": st.column_config.NumberColumn("H. D3", format="%.2f h"),
+            "giros_3": st.column_config.NumberColumn("🌀 Giro 3"),
+            "total dia (h)": st.column_config.NumberColumn("Total Dia", format="%.2f h", disabled=True)
+        }
+
+        ed_crono = st.data_editor(df_cronograma, num_rows="dynamic", key="ed_crono", use_container_width=True, hide_index=True, column_config=config_crono_gestao)
         
         if st.button("Salvar Cronograma", type="primary"):
             # O comando abaixo limpa o cache ANTES de salvar para garantir a atualização
             st.cache_data.clear()
+            
+            # Recalcula o total de horas do dia para garantir que os dados fiquem certos
+            for i in range(1, 4):
+                ed_crono[f"tempo d{i} (h)"] = pd.to_numeric(ed_crono[f"tempo d{i} (h)"], errors='coerce').fillna(0)
+            
+            ed_crono["total dia (h)"] = ed_crono["tempo d1 (h)"] + ed_crono["tempo d2 (h)"] + ed_crono["tempo d3 (h)"]
+            
             overwrite_data("cronograma", ed_crono)
             st.success("Cronograma vinculado com sucesso!")
             st.rerun()
