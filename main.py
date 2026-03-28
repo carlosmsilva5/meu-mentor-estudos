@@ -358,18 +358,18 @@ elif page == "Registrar Estudo":
             dia_crono = st.selectbox("Dia", [1, 2, 3, 4, 5, 6, 7], help="Indique qual dia do seu cronograma de 7 dias você está executando agora.")
             # NOVO CAMPO: Atualizar o Giro do Ciclo
             giro_informado = st.number_input("Giro Atual", min_value=1, step=1, value=1, help="Informe em qual giro você está para atualizar automaticamente a tabela do cronograma.")
-        
-        st.divider()
-        st.markdown("📖 **Leitura de Páginas**")
-        p1, p2 = st.columns(2)
-        p_inicio = p1.number_input("Página Inicial", 0)
-        p_fim = p2.number_input("Página Final", 0)
-        
+                      
         st.divider()
         st.markdown("📝 **Questões**")
         cq1, cq2 = st.columns(2)
         q_t = cq1.number_input("Qtd Questões", 0)
         q_a = cq2.number_input("Acertos", 0)
+
+        st.divider()
+        st.markdown("📖 **Leitura de Páginas**")
+        p1, p2 = st.columns(2)
+        p_inicio = p1.number_input("Página Inicial", 0)
+        p_fim = p2.number_input("Página Final", 0)
         
         if st.form_submit_button("Salvar Registro"):
             total_paginas = (p_fim - p_inicio) + 1 if p_fim >= p_inicio and p_fim > 0 else 0
