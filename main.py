@@ -202,7 +202,7 @@ if page == "Home":
             
             # Divisão de Tempo por Tipo
             df_tipos = df_estudo.groupby(["materia", "tipo_estudo"])["tempo_num"].sum().unstack(fill_value=0).reset_index()
-            for t in ["Teoria Novo", "Revisão", "Questões"]:
+            for t in ["Teoria", "Revisão", "Questões"]:
                 if t not in df_tipos.columns: df_tipos[t] = 0
             
             painel_completo = pd.merge(painel_disc, df_tipos, on="materia", how="left")
@@ -355,9 +355,9 @@ elif page == "Registrar Estudo":
             humor = st.selectbox("Humor/Energia", ["Focado ⚡", "Neutro 😐", "Cansado 😴"])
         with col3:
             # NOVO CAMPO: Dia do Cronograma
-            dia_crono = st.selectbox("Dia do Ciclo Estudado", [1, 2, 3, 4, 5, 6, 7], help="Indique qual dia do seu cronograma de 7 dias você está executando agora.")
+            dia_crono = st.selectbox("Dia", [1, 2, 3, 4, 5, 6, 7], help="Indique qual dia do seu cronograma de 7 dias você está executando agora.")
             # NOVO CAMPO: Atualizar o Giro do Ciclo
-            giro_informado = st.number_input("Giro Atual (Atualiza o Dashboard)", min_value=1, step=1, value=1, help="Informe em qual giro você está para atualizar automaticamente a tabela do cronograma.")
+            giro_informado = st.number_input("Giro Atual", min_value=1, step=1, value=1, help="Informe em qual giro você está para atualizar automaticamente a tabela do cronograma.")
         
         st.divider()
         st.markdown("📖 **Leitura de Páginas**")
