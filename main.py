@@ -212,14 +212,8 @@ if page == "Home":
             painel_completo = pd.merge(painel_disc, df_tipos, on="materia", how="left")
             
             # --- RECUPERAÇÃO DO GRÁFICO RADAR (ESTILO PREMIUM MANTIDO) ---
-            import textwrap
-            
             painel_completo["aproveitamento"] = (painel_completo["q_acertos"] / painel_completo["q_total"] * 100).fillna(0)
-            
-            # Quebra textos muito longos a cada 20 caracteres para não vazar a tela e junta com o percentual
-            painel_completo["materia_label"] = painel_completo.apply(
-                lambda row: f"{'<br>'.join(textwrap.wrap(str(row['materia']), width=22))}<br>{row['aproveitamento']:.1f}%", axis=1
-            )
+            painel_completo["materia_label"] = painel_completo.apply(lambda row: f"{row['materia']}<br>{row['aproveitamento']:.1f}%", axis=1)
             
             # 1. Definir a cor dinâmica baseada na média de aproveitamento
             media_aprov = painel_completo["aproveitamento"].mean()
@@ -251,21 +245,16 @@ if page == "Home":
                         gridcolor='#4f4f4f',
                         showticklabels=False  # <--- ISSO REMOVE OS NÚMEROS INTERNOS
                     ),
-                    angularaxis=dict(
-                        color='white', 
-                        gridcolor='#4f4f4f',
-                        dtick=1  # <--- FORÇA O PLOTLY A MOSTRAR TODOS OS RÓTULOS
-                    )
+                    angularaxis=dict(color='white', gridcolor='#4f4f4f')
                 ),
                 paper_bgcolor='rgba(0,0,0,0)', 
                 plot_bgcolor='rgba(0,0,0,0)', 
                 font=dict(color='white'),
-                # AUMENTO DAS MARGENS PARA IMPEDIR QUE TEXTOS LONGOS SEJAM CORTADOS
-                margin=dict(l=70, r=70, t=50, b=50) 
+                margin=dict(l=40, r=40, t=20, b=20)
             )
             st.plotly_chart(fig_radar, use_container_width=True, config={'staticPlot': True})
             # -------------------------------------------------------------
-                
+            
             # --- TABELA DE DETALHAMENTO ATUALIZADA ---
             st.markdown("#### Detalhamento das Matérias")
             tab_v = painel_completo.copy()
