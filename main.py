@@ -168,15 +168,19 @@ if page == "Home":
     # --- NOVO BLOCO: CRONOGRAMA DE ESTUDOS NO DASHBOARD ---
     st.subheader("🗓️ Cronograma Atual")
     
-    html_tabela_home = """<table style="width:100%; border-collapse: collapse; background-color: #3a3b3c; color: white; border-radius: 10px; overflow: hidden; border: 1px solid #4f4f4f;"><thead><tr style="background-color: #202225; color: #3ec6a8; text-align: left;"><th style="padding: 12px; border: 1px solid #4f4f4f;">Sequência</th><th style="padding: 12px; border: 1px solid #4f4f4f;">Matéria 01</th><th style="padding: 12px; border: 1px solid #4f4f4f; text-align: center;">🌀 Giro</th><th style="padding: 12px; border: 1px solid #4f4f4f;">Matéria 02</th><th style="padding: 12px; border: 1px solid #4f4f4f;">Matéria 03</th><th style="padding: 12px; border: 1px solid #4f4f4f; background-color: #2b2d2e; text-align: center;">Total Dia</th></tr></thead><tbody>"""
+    html_tabela_home = """<table style="width:100%; border-collapse: collapse; background-color: #3a3b3c; color: white; border-radius: 10px; overflow: hidden; border: 1px solid #4f4f4f;"><thead><tr style="background-color: #202225; color: #3ec6a8; text-align: left;"><th style="padding: 12px; border: 1px solid #4f4f4f;">Sequência</th><th style="padding: 12px; border: 1px solid #4f4f4f;">Matéria 01</th><th style="padding: 12px; border: 1px solid #4f4f4f; text-align: center;">🌀 Giro 1</th><th style="padding: 12px; border: 1px solid #4f4f4f;">Matéria 02</th><th style="padding: 12px; border: 1px solid #4f4f4f; text-align: center;">🌀 Giro 2</th><th style="padding: 12px; border: 1px solid #4f4f4f;">Matéria 03</th><th style="padding: 12px; border: 1px solid #4f4f4f; text-align: center;">🌀 Giro 3</th><th style="padding: 12px; border: 1px solid #4f4f4f; background-color: #2b2d2e; text-align: center;">Total Dia</th></tr></thead><tbody>"""
     
     for _, row in df_cronograma.iterrows():
         m1, m2, m3 = [str(row.get(f'disciplina 0{i}', '-')) for i in range(1, 4)]
         t1, t2, t3 = [f"{row.get(f'tempo d{i} (h)', 0):.2f}h" if x != '-' and x != 'nan' else "" for i, x in enumerate([m1, m2, m3], 1)]
         total_dia = f"{row.get('total dia (h)', 0):.2f}h"
         ordem_v = row.get('ordem', '-')
+        
+        g1 = int(row.get('giros', 1)) if pd.notna(row.get('giros')) else 1
+        g2 = int(row.get('giros_2', 1)) if pd.notna(row.get('giros_2')) else 1
+        g3 = int(row.get('giros_3', 1)) if pd.notna(row.get('giros_3')) else 1
 
-        html_tabela_home += f"""<tr style="border-bottom: 1px solid #4f4f4f;"><td style="padding: 10px; border: 1px solid #4f4f4f; font-weight: bold; background: #2b2d2e; text-align: center;">{ordem_v}</td><td style="padding: 10px; border: 1px solid #4f4f4f;">{m1 if m1 != 'nan' else '-'} <br><small style='color:#3ec6a8'>{t1}</small></td><td style="padding: 10px; border: 1px solid #4f4f4f; text-align: center;">{int(row.get('giros', 1)) if pd.notna(row.get('giros')) else 1}</td><td style="padding: 10px; border: 1px solid #4f4f4f;">{m2 if m2 != 'nan' else '-'} <br><small style='color:#3ec6a8'>{t2}</small></td><td style="padding: 10px; border: 1px solid #4f4f4f;">{m3 if m3 != 'nan' else '-'} <br><small style='color:#3ec6a8'>{t3}</small></td><td style="padding: 10px; border: 1px solid #4f4f4f; font-weight: bold; color: #3ec6a8; background: #2b2d2e; text-align: center;">{total_dia}</td></tr>"""
+        html_tabela_home += f"""<tr style="border-bottom: 1px solid #4f4f4f;"><td style="padding: 10px; border: 1px solid #4f4f4f; font-weight: bold; background: #2b2d2e; text-align: center;">{ordem_v}</td><td style="padding: 10px; border: 1px solid #4f4f4f;">{m1 if m1 != 'nan' else '-'} <br><small style='color:#3ec6a8'>{t1}</small></td><td style="padding: 10px; border: 1px solid #4f4f4f; text-align: center;">{g1 if m1 != '-' and m1 != 'nan' else '-'}</td><td style="padding: 10px; border: 1px solid #4f4f4f;">{m2 if m2 != 'nan' else '-'} <br><small style='color:#3ec6a8'>{t2}</small></td><td style="padding: 10px; border: 1px solid #4f4f4f; text-align: center;">{g2 if m2 != '-' and m2 != 'nan' else '-'}</td><td style="padding: 10px; border: 1px solid #4f4f4f;">{m3 if m3 != 'nan' else '-'} <br><small style='color:#3ec6a8'>{t3}</small></td><td style="padding: 10px; border: 1px solid #4f4f4f; text-align: center;">{g3 if m3 != '-' and m3 != 'nan' else '-'}</td><td style="padding: 10px; border: 1px solid #4f4f4f; font-weight: bold; color: #3ec6a8; background: #2b2d2e; text-align: center;">{total_dia}</td></tr>"""
     
     st.markdown(html_tabela_home + "</tbody></table>", unsafe_allow_html=True)
     st.divider()
@@ -367,7 +371,14 @@ elif page == "Registrar Estudo":
                 # O índice da tabela reflete o dia selecionado (1 equivale ao índice 0, etc.)
                 idx = dia_crono - 1
                 if idx < len(df_cronograma):
-                    df_cronograma.at[idx, 'giros'] = giro_informado
+                    # Procura em qual bloco a matéria se encontra para atualizar o giro correspondente
+                    if str(df_cronograma.at[idx, 'disciplina 01']).strip() == materia:
+                        df_cronograma.at[idx, 'giros'] = giro_informado
+                    elif str(df_cronograma.at[idx, 'disciplina 02']).strip() == materia:
+                        df_cronograma.at[idx, 'giros_2'] = giro_informado
+                    elif str(df_cronograma.at[idx, 'disciplina 03']).strip() == materia:
+                        df_cronograma.at[idx, 'giros_3'] = giro_informado
+                        
                     overwrite_data("cronograma", df_cronograma)
             
             novo_dado = pd.DataFrame([{
@@ -397,3 +408,273 @@ elif page == "Caderno de Erros":
         tipo_e = st.selectbox("Motivo do Erro", tipos_erro) # NOVO CAMPO DE SELEÇÃO
         link_e = st.text_input("Link ou Referência da Questão")
         obs_e = st.text_area("Insight: O que você aprendeu com esse erro?")
+        
+        if st.form_submit_button("Registrar no Caderno"):
+            # Agora a variável 'tipo' recebe a sua escolha (tipo_e) em vez de ser fixa
+            novo_e = pd.DataFrame([{"data": datetime.now().strftime("%d/%m/%Y"), "materia": m_e, "tipo": tipo_e, "link": link_e, "comentario": obs_e}])
+            
+            df_atual_e = conn.read(worksheet="caderno_erros").dropna(how='all')
+            # Garante que as colunas existam
+            if df_atual_e.empty:
+                df_atual_e = pd.DataFrame(columns=["data", "materia", "tipo", "link", "comentario"])
+                
+            conn.update(worksheet="caderno_erros", data=pd.concat([df_atual_e, novo_e], ignore_index=True))
+            st.cache_data.clear()
+            st.success(f"Erro de '{tipo_e}' catalogado com sucesso!")
+            st.rerun()
+
+    st.divider()
+    st.subheader("📚 Seus Erros Registrados")
+    
+    if not df_erros.empty:
+        st.dataframe(
+            df_erros, 
+            use_container_width=True, 
+            hide_index=True,
+            column_config={
+                "data": "Data",
+                "materia": "Matéria",
+                "tipo": st.column_config.TextColumn("Motivo"), # Mostrando o motivo na tabela
+                "link": st.column_config.LinkColumn("Link da Questão"),
+                "comentario": st.column_config.TextColumn("Insight / Aprendizado")
+            }
+        )
+    else:
+        st.info("Você ainda não registrou nenhum erro no caderno. Bom trabalho (ou vá fazer mais questões!) 😉")
+    
+   
+elif page == "Ciclo de Estudos":
+    st.title("🎯 Planejamento do Ciclo")
+    
+    # 1. Badge de Giro Global
+    giro_global = calcular_giro_atual(df_estudo)
+    st.markdown(f'<div class="giro-badge">🔄 Você está no Giro {giro_global} do Ciclo Global</div>', unsafe_allow_html=True)
+    
+    # 2. Carga Horária Semanal
+    horas_semana = st.number_input("Horas totais pretendidas na semana:", 5, 100, 25)
+
+    st.write("---")
+
+    # --- 3. LÓGICA DE CÁLCULO ---
+    materias_ativas = []
+    fatores_ativos = []
+    for m in materias_list:
+        if st.session_state.get(f"check_{m}", True):
+            p_val = st.session_state.get(f"p_ciclo_{m}", 3)
+            n_val = st.session_state.get(f"n_ciclo_{m}", 3)
+            materias_ativas.append(m)
+            fatores_ativos.append(p_val / n_val)
+    
+    soma_fatores = sum(fatores_ativos) if fatores_ativos else 1
+
+    # --- 4. RENDERIZAÇÃO DOS CARDS E CONTROLES ---
+    cols = st.columns(3)
+    metas_calculadas_horas = {} 
+
+    for i, m in enumerate(materias_list):
+        with cols[i % 3]:
+            ativo = st.checkbox(f"Incluir {m}", value=True, key=f"check_{m}")
+            p_atual = st.session_state.get(f"p_ciclo_{m}", 3)
+            n_atual = st.session_state.get(f"n_ciclo_{m}", 3)
+            
+            # Cálculo do tempo sugerido
+            horas_sug = ((p_atual / n_atual) / soma_fatores) * horas_semana if ativo else 0.0
+            metas_calculadas_horas[m] = round(horas_sug, 2)
+
+            st.markdown(f"""
+                <div style="background:{'#3a3b3c' if ativo else '#202225'}; padding:15px; border-radius:10px; border-top:4px solid {'#3ec6a8' if ativo else '#4f4f4f'}; text-align:center; margin-bottom:10px; opacity:{'1' if ativo else '0.3'};">
+                    <b style="color:#b0b3b8; font-size:12px; text-transform:uppercase;">{m}</b><br>
+                    <span style="color:white; font-size:24px; font-weight:bold;">{decimal_para_horas(horas_sug)}</span><br>
+                    <small style="color:{'#3ec6a8' if ativo else '#4f4f4f'};">{"Meta Semanal" if ativo else "Fora do Ciclo"}</small>
+                </div>
+            """, unsafe_allow_html=True)
+
+            st.select_slider("Peso", [1,2,3,4,5], 3, key=f"p_ciclo_{m}", disabled=not ativo)
+            st.select_slider("Nível", [1,2,3,4,5], 3, key=f"n_ciclo_{m}", disabled=not ativo)
+
+    st.divider()
+
+    # --- 5. CRONOGRAMA DE EXECUÇÃO (EDITOR) ---
+    st.subheader("🗓️ Cronograma de Execução (Editor)")
+    
+    if st.button("🪄 Distribuir Horas Calculadas na Tabela", use_container_width=True):
+        df_temp = df_cronograma.copy()
+        
+        # Mapear aparições para dividir o tempo corretamente
+        aparicoes = {}
+        for c in ["disciplina 01", "disciplina 02", "disciplina 03"]:
+            if c in df_temp.columns:
+                for mat in df_temp[c].dropna():
+                    if mat != "-":
+                        aparicoes[mat] = aparicoes.get(mat, 0) + 1
+
+        # Aplicar os tempos sugeridos divididos pelas aparições
+        for idx, row in df_temp.iterrows():
+            dia_total = 0
+            for i in range(1, 4):
+                col_m = f"disciplina 0{i}"
+                col_h = f"tempo d{i} (h)"
+                m_nome = str(row.get(col_m, "-")).strip()
+                
+                if m_nome in metas_calculadas_horas:
+                    v_vezes = aparicoes.get(m_nome, 1)
+                    valor_h = metas_calculadas_horas[m_nome] / v_vezes
+                    df_temp.at[idx, col_h] = round(valor_h, 2)
+                    dia_total += valor_h
+            df_temp.at[idx, "total dia (h)"] = round(dia_total, 2)
+        
+        overwrite_data("cronograma", df_temp)
+        st.success("🪄 Horas distribuídas! Revise e clique em 'Salvar e Aplicar' abaixo.")
+        st.rerun()
+
+    # Configuração do Editor
+    config_crono = {
+        "ordem": st.column_config.TextColumn("Sequência", disabled=True),
+        "disciplina 01": st.column_config.SelectboxColumn("Materia 01", options=materias_list),
+        "tempo d1 (h)": st.column_config.NumberColumn("H. D1", format="%.2f h"),
+        "giros": st.column_config.NumberColumn("🌀 Giro 1"),
+        "disciplina 02": st.column_config.SelectboxColumn("Materia 02", options=materias_list),
+        "tempo d2 (h)": st.column_config.NumberColumn("H. D2", format="%.2f h"),
+        "giros_2": st.column_config.NumberColumn("🌀 Giro 2"),
+        "disciplina 03": st.column_config.SelectboxColumn("Materia 03", options=materias_list),
+        "tempo d3 (h)": st.column_config.NumberColumn("H. D3", format="%.2f h"),
+        "giros_3": st.column_config.NumberColumn("🌀 Giro 3"),
+        "total dia (h)": st.column_config.NumberColumn("Total Dia", format="%.2f h", disabled=True)
+    }
+
+    ed_ciclo = st.data_editor(df_cronograma, num_rows="fixed", use_container_width=True, hide_index=True, column_config=config_crono, key="ed_ciclo_final_fix")
+
+    if st.button("💾 Salvar e Aplicar Ciclo", type="primary", use_container_width=True):
+        ed_ciclo["total dia (h)"] = ed_ciclo["tempo d1 (h)"].fillna(0) + ed_ciclo["tempo d2 (h)"].fillna(0) + ed_ciclo["tempo d3 (h)"].fillna(0)
+        # Salva em minutos para compatibilidade com o Dashboard
+        for i in range(1, 4):
+            ed_ciclo[f"tempo d{i} (min)"] = (ed_ciclo[f"tempo d{i} (h)"] * 60).astype(int)
+        overwrite_data("cronograma", ed_ciclo)
+        st.success("✅ Ciclo atualizado e salvo!")
+        st.rerun()
+
+    # --- 6. FIGURA VISUAL DO CRONOGRAMA (RESUMO) ---
+    st.write("---")
+    st.subheader("🖼️ Visualização do Cronograma Salvo")
+    
+    html_tabela = """<table style="width:100%; border-collapse: collapse; background-color: #3a3b3c; color: white; border-radius: 10px; overflow: hidden; border: 1px solid #4f4f4f;"><thead><tr style="background-color: #202225; color: #3ec6a8; text-align: left;"><th style="padding: 12px; border: 1px solid #4f4f4f;">Sequência</th><th style="padding: 12px; border: 1px solid #4f4f4f;">Matéria 01</th><th style="padding: 12px; border: 1px solid #4f4f4f; text-align: center;">🌀 Giro 1</th><th style="padding: 12px; border: 1px solid #4f4f4f;">Matéria 02</th><th style="padding: 12px; border: 1px solid #4f4f4f; text-align: center;">🌀 Giro 2</th><th style="padding: 12px; border: 1px solid #4f4f4f;">Matéria 03</th><th style="padding: 12px; border: 1px solid #4f4f4f; text-align: center;">🌀 Giro 3</th><th style="padding: 12px; border: 1px solid #4f4f4f; background-color: #2b2d2e; text-align: center;">Total Dia</th></tr></thead><tbody>"""
+    
+    for _, row in df_cronograma.iterrows():
+        m1, m2, m3 = [str(row.get(f'disciplina 0{i}', '-')) for i in range(1, 4)]
+        t1, t2, t3 = [f"{row.get(f'tempo d{i} (h)', 0):.2f}h" if x != '-' and x != 'nan' else "" for i, x in enumerate([m1, m2, m3], 1)]
+        total_dia = f"{row.get('total dia (h)', 0):.2f}h"
+        
+        g1 = int(row.get('giros', 1)) if pd.notna(row.get('giros')) else 1
+        g2 = int(row.get('giros_2', 1)) if pd.notna(row.get('giros_2')) else 1
+        g3 = int(row.get('giros_3', 1)) if pd.notna(row.get('giros_3')) else 1
+
+        html_tabela += f"""<tr style="border-bottom: 1px solid #4f4f4f;"><td style="padding: 10px; border: 1px solid #4f4f4f; font-weight: bold; background: #2b2d2e; text-align: center;">{row['ordem']}</td><td style="padding: 10px; border: 1px solid #4f4f4f;">{m1 if m1 != 'nan' else '-'} <br><small style='color:#3ec6a8'>{t1}</small></td><td style="padding: 10px; border: 1px solid #4f4f4f; text-align: center;">{g1 if m1 != '-' and m1 != 'nan' else '-'}</td><td style="padding: 10px; border: 1px solid #4f4f4f;">{m2 if m2 != 'nan' else '-'} <br><small style='color:#3ec6a8'>{t2}</small></td><td style="padding: 10px; border: 1px solid #4f4f4f; text-align: center;">{g2 if m2 != '-' and m2 != 'nan' else '-'}</td><td style="padding: 10px; border: 1px solid #4f4f4f;">{m3 if m3 != 'nan' else '-'} <br><small style='color:#3ec6a8'>{t3}</small></td><td style="padding: 10px; border: 1px solid #4f4f4f; text-align: center;">{g3 if m3 != '-' and m3 != 'nan' else '-'}</td><td style="padding: 10px; border: 1px solid #4f4f4f; font-weight: bold; color: #3ec6a8; background: #2b2d2e; text-align: center;">{total_dia}</td></tr>"""
+    
+    st.markdown(html_tabela + "</tbody></table>", unsafe_allow_html=True)
+
+elif page == "Gestão de Dados":
+    st.title("⚙️ Painel de Controle")
+    t1, t2, t3, t4 = st.tabs(["🗓️ Editar Cronograma", "📚 Matérias", "📝 Histórico", "❌ Erros"])
+    
+    with t1:
+        st.markdown("### 🗓️ Personalize sua semana de estudos")
+        st.info("As alterações feitas aqui aparecerão na aba 'Ciclo de Estudos'.")
+        
+        # Se o cronograma estiver vazio, cria um modelo inicial
+        if df_cronograma.empty:
+            df_cronograma = pd.DataFrame([
+                {"Dia": "Segunda", "Materia 1": "-", "Tempo (min)": 60, "Materia 2": "-", "Tempo 2 (min)": 60},
+                {"Dia": "Terça", "Materia 1": "-", "Tempo (min)": 60, "Materia 2": "-", "Tempo 2 (min)": 60}
+            ])
+
+        ed_crono = st.data_editor(df_cronograma, num_rows="dynamic", key="ed_crono", use_container_width=True, hide_index=True)
+        
+        if st.button("Salvar Cronograma", type="primary"):
+            # O comando abaixo limpa o cache ANTES de salvar para garantir a atualização
+            st.cache_data.clear()
+            overwrite_data("cronograma", ed_crono)
+            st.success("Cronograma vinculado com sucesso!")
+            st.rerun()
+
+    with t2:
+        st.markdown("### 📚 Gerenciar Disciplinas")
+        
+        # --- ADICIONAR NOVA MATÉRIA ---
+        with st.expander("➕ Adicionar Nova Disciplina", expanded=True):
+            nova = st.text_input("Nome da Matéria")
+            if st.button("Confirmar Adição"):
+                if nova and nova not in materias_list:
+                    nova_lista = ",".join(materias_list + [nova])
+                    overwrite_data("config", pd.DataFrame([{"materias": nova_lista}]))
+                    st.success(f"✅ {nova} adicionada com sucesso!")
+                    st.rerun()
+                elif nova in materias_list:
+                    st.warning("Esta matéria já está cadastrada.")
+                else:
+                    st.error("Digite um nome válido.")
+
+        st.divider()
+
+        # --- EXCLUIR MATÉRIA EXISTENTE ---
+        with st.expander("🗑️ Excluir Disciplina"):
+            if materias_list:
+                materia_para_excluir = st.selectbox("Selecione a matéria para remover:", materias_list)
+                
+                st.warning(f"Atenção: Excluir '{materia_para_excluir}' não apagará seu histórico de estudos, mas ela não aparecerá mais nos novos registros ou ciclos.")
+                
+                if st.button("🚨 Excluir Definitivamente", type="secondary"):
+                    # Filtra a lista removendo a matéria selecionada
+                    nova_lista_materias = [m for m in materias_list if m != materia_para_excluir]
+                    nova_string = ",".join(nova_lista_materias)
+                    
+                    overwrite_data("config", pd.DataFrame([{"materias": nova_string}]))
+                    st.success(f"❌ {materia_para_excluir} removida!")
+                    st.rerun()
+            else:
+                st.info("Nenhuma matéria cadastrada para excluir.")
+            
+    with t3:
+        st.markdown("### Editar Histórico de Sessões")
+        if not df_estudo.empty:
+            ed_est = st.data_editor(df_estudo, num_rows="dynamic", key="ed_est", use_container_width=True)
+            if st.button("Salvar Histórico"):
+                overwrite_data("progresso", ed_est)
+                st.success("Histórico salvo!")
+                st.rerun()
+                
+            st.divider()
+            
+            # Nova seção: Zona de Perigo para zerar o histórico
+            with st.expander("⚠️ Zona de Perigo (Apagar Tudo)"):
+                st.warning("Tem certeza? Esta ação apagará **TODO** o seu histórico de estudos e zerará os gráficos. Esta ação não pode ser desfeita no aplicativo.")
+                if st.button("🚨 Sim, Quero Zerar Meu Histórico", type="primary"):
+                    # Cria um DataFrame vazio apenas com as colunas originais para não quebrar a planilha
+                    df_vazio = pd.DataFrame(columns=["data", "materia", "tipo_estudo", "tempo", "acertos", "total_q"])
+                    overwrite_data("progresso", df_vazio)
+                    st.success("Histórico completamente zerado! Recomeçando de forma limpa.")
+                    st.rerun()
+        else:
+            st.info("Seu histórico de estudos já está completamente vazio! Faça alguns pomodoros para começar a gerar dados. 🚀")
+                
+    with t4:
+        st.markdown("### Editar Caderno de Erros")
+        if not df_erros.empty:
+            ed_err = st.data_editor(df_erros, num_rows="dynamic", key="ed_err", use_container_width=True)
+            if st.button("Salvar Alterações de Erros", type="primary"):
+                overwrite_data("caderno_erros", ed_err)
+                st.success("Erros atualizados!")
+                st.rerun()
+            
+            st.divider()
+            
+            # Nova seção: Zona de Perigo para zerar o Caderno de Erros
+            with st.expander("⚠️ Zona de Perigo (Limpar Caderno de Erros)"):
+                st.warning("Atenção: Isso apagará todos os insights e links de questões registrados. Esta ação não pode ser desfeita.")
+                if st.button("🚨 Sim, Quero Limpar Todo o Caderno de Erros", key="btn_zerar_erros"):
+                    # Cria um DataFrame vazio com as colunas corretas da aba de erros
+                    df_vazio_erros = pd.DataFrame(columns=["data", "materia", "tipo", "link", "comentario"])
+                    overwrite_data("caderno_erros", df_vazio_erros)
+                    st.success("Caderno de erros limpo com sucesso!")
+                    st.rerun()
+        else:
+            st.warning("O seu caderno de erros está vazio no momento. Registre novos erros na aba 'Caderno de Erros'.")
