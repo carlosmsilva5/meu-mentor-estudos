@@ -332,7 +332,7 @@ if page == "Home":
 
             # 3. Gráfico 2: Desempenho Geral (Texto Fixo %)
             st.subheader("Desempenho Geral (7 Dias)")
-            fig_desempenho = px.line(evol, x='data_label', y='perc_acerto', markers=True, text='perc_acerto', color_discrete_sequence=['#ffffff'])
+            fig_desempenho = px.line(evol, x='data_label', y='perc_acerto', markers=True, text='perc_acerto', color_discrete_sequence=['#3ec6a8'])
             fig_desempenho.update_traces(textposition="top center", texttemplate='%{text}%')
             fig_desempenho.add_hline(y=90, line_dash="dash", line_color="#4f4f4f", annotation_text="Meta 90%")
             fig_desempenho.update_layout(
