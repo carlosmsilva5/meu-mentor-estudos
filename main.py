@@ -168,15 +168,19 @@ if page == "Home":
     # --- NOVO BLOCO: CRONOGRAMA DE ESTUDOS NO DASHBOARD ---
     st.subheader("🗓️ Cronograma Atual")
     
-    html_tabela_home = """<table style="width:100%; border-collapse: collapse; background-color: #3a3b3c; color: white; border-radius: 10px; overflow: hidden; border: 1px solid #4f4f4f;"><thead><tr style="background-color: #202225; color: #3ec6a8; text-align: left;"><th style="padding: 12px; border: 1px solid #4f4f4f;">Sequência</th><th style="padding: 12px; border: 1px solid #4f4f4f;">Matéria 01</th><th style="padding: 12px; border: 1px solid #4f4f4f; text-align: center;">🌀 Giro</th><th style="padding: 12px; border: 1px solid #4f4f4f;">Matéria 02</th><th style="padding: 12px; border: 1px solid #4f4f4f;">Matéria 03</th><th style="padding: 12px; border: 1px solid #4f4f4f; background-color: #2b2d2e; text-align: center;">Total Dia</th></tr></thead><tbody>"""
+    html_tabela_home = """<table style="width:100%; border-collapse: collapse; background-color: #3a3b3c; color: white; border-radius: 10px; overflow: hidden; border: 1px solid #4f4f4f;"><thead><tr style="background-color: #202225; color: #3ec6a8; text-align: left;"><th style="padding: 12px; border: 1px solid #4f4f4f;">Sequência</th><th style="padding: 12px; border: 1px solid #4f4f4f;">Matéria 01</th><th style="padding: 12px; border: 1px solid #4f4f4f; text-align: center;">🌀 Giro 1</th><th style="padding: 12px; border: 1px solid #4f4f4f;">Matéria 02</th><th style="padding: 12px; border: 1px solid #4f4f4f; text-align: center;">🌀 Giro 2</th><th style="padding: 12px; border: 1px solid #4f4f4f;">Matéria 03</th><th style="padding: 12px; border: 1px solid #4f4f4f; text-align: center;">🌀 Giro 3</th><th style="padding: 12px; border: 1px solid #4f4f4f; background-color: #2b2d2e; text-align: center;">Total Dia</th></tr></thead><tbody>"""
     
     for _, row in df_cronograma.iterrows():
         m1, m2, m3 = [str(row.get(f'disciplina 0{i}', '-')) for i in range(1, 4)]
         t1, t2, t3 = [f"{row.get(f'tempo d{i} (h)', 0):.2f}h" if x != '-' and x != 'nan' else "" for i, x in enumerate([m1, m2, m3], 1)]
         total_dia = f"{row.get('total dia (h)', 0):.2f}h"
         ordem_v = row.get('ordem', '-')
+        
+        g1 = int(row.get('giros', 1)) if pd.notna(row.get('giros')) else 1
+        g2 = int(row.get('giros_2', 1)) if pd.notna(row.get('giros_2')) else 1
+        g3 = int(row.get('giros_3', 1)) if pd.notna(row.get('giros_3')) else 1
 
-        html_tabela_home += f"""<tr style="border-bottom: 1px solid #4f4f4f;"><td style="padding: 10px; border: 1px solid #4f4f4f; font-weight: bold; background: #2b2d2e; text-align: center;">{ordem_v}</td><td style="padding: 10px; border: 1px solid #4f4f4f;">{m1 if m1 != 'nan' else '-'} <br><small style='color:#3ec6a8'>{t1}</small></td><td style="padding: 10px; border: 1px solid #4f4f4f; text-align: center;">{int(row.get('giros', 1)) if pd.notna(row.get('giros')) else 1}</td><td style="padding: 10px; border: 1px solid #4f4f4f;">{m2 if m2 != 'nan' else '-'} <br><small style='color:#3ec6a8'>{t2}</small></td><td style="padding: 10px; border: 1px solid #4f4f4f;">{m3 if m3 != 'nan' else '-'} <br><small style='color:#3ec6a8'>{t3}</small></td><td style="padding: 10px; border: 1px solid #4f4f4f; font-weight: bold; color: #3ec6a8; background: #2b2d2e; text-align: center;">{total_dia}</td></tr>"""
+        html_tabela_home += f"""<tr style="border-bottom: 1px solid #4f4f4f;"><td style="padding: 10px; border: 1px solid #4f4f4f; font-weight: bold; background: #2b2d2e; text-align: center;">{ordem_v}</td><td style="padding: 10px; border: 1px solid #4f4f4f;">{m1 if m1 != 'nan' else '-'} <br><small style='color:#3ec6a8'>{t1}</small></td><td style="padding: 10px; border: 1px solid #4f4f4f; text-align: center;">{g1 if m1 != '-' and m1 != 'nan' else '-'}</td><td style="padding: 10px; border: 1px solid #4f4f4f;">{m2 if m2 != 'nan' else '-'} <br><small style='color:#3ec6a8'>{t2}</small></td><td style="padding: 10px; border: 1px solid #4f4f4f; text-align: center;">{g2 if m2 != '-' and m2 != 'nan' else '-'}</td><td style="padding: 10px; border: 1px solid #4f4f4f;">{m3 if m3 != 'nan' else '-'} <br><small style='color:#3ec6a8'>{t3}</small></td><td style="padding: 10px; border: 1px solid #4f4f4f; text-align: center;">{g3 if m3 != '-' and m3 != 'nan' else '-'}</td><td style="padding: 10px; border: 1px solid #4f4f4f; font-weight: bold; color: #3ec6a8; background: #2b2d2e; text-align: center;">{total_dia}</td></tr>"""
     
     st.markdown(html_tabela_home + "</tbody></table>", unsafe_allow_html=True)
     st.divider()
@@ -202,20 +206,14 @@ if page == "Home":
             
             # Divisão de Tempo por Tipo
             df_tipos = df_estudo.groupby(["materia", "tipo_estudo"])["tempo_num"].sum().unstack(fill_value=0).reset_index()
-            for t in ["Teoria", "Revisão", "Questões"]:
+            for t in ["Teoria Novo", "Revisão", "Questões"]:
                 if t not in df_tipos.columns: df_tipos[t] = 0
             
             painel_completo = pd.merge(painel_disc, df_tipos, on="materia", how="left")
             
             # --- RECUPERAÇÃO DO GRÁFICO RADAR (ESTILO PREMIUM MANTIDO) ---
-            import textwrap
-            
             painel_completo["aproveitamento"] = (painel_completo["q_acertos"] / painel_completo["q_total"] * 100).fillna(0)
-            
-            # Quebra textos muito longos a cada 20 caracteres para não vazar a tela e junta com o percentual
-            painel_completo["materia_label"] = painel_completo.apply(
-                lambda row: f"{'<br>'.join(textwrap.wrap(str(row['materia']), width=22))}<br>{row['aproveitamento']:.1f}%", axis=1
-            )
+            painel_completo["materia_label"] = painel_completo.apply(lambda row: f"{row['materia']}<br>{row['aproveitamento']:.1f}%", axis=1)
             
             # 1. Definir a cor dinâmica baseada na média de aproveitamento
             media_aprov = painel_completo["aproveitamento"].mean()
@@ -247,17 +245,12 @@ if page == "Home":
                         gridcolor='#4f4f4f',
                         showticklabels=False  # <--- ISSO REMOVE OS NÚMEROS INTERNOS
                     ),
-                    angularaxis=dict(
-                        color='white', 
-                        gridcolor='#4f4f4f',
-                        dtick=1  # <--- FORÇA O PLOTLY A MOSTRAR TODOS OS RÓTULOS
-                    )
+                    angularaxis=dict(color='white', gridcolor='#4f4f4f')
                 ),
                 paper_bgcolor='rgba(0,0,0,0)', 
                 plot_bgcolor='rgba(0,0,0,0)', 
                 font=dict(color='white'),
-                # AUMENTO DAS MARGENS PARA IMPEDIR QUE TEXTOS LONGOS SEJAM CORTADOS
-                margin=dict(l=70, r=70, t=50, b=50) 
+                margin=dict(l=40, r=40, t=20, b=20)
             )
             st.plotly_chart(fig_radar, use_container_width=True, config={'staticPlot': True})
             # -------------------------------------------------------------
@@ -268,7 +261,7 @@ if page == "Home":
             
             # Formatação de Tempos
             tab_v["Total"] = tab_v["tempo_total"].apply(formatar_tempo)
-            tab_v["Teoria"] = tab_v["Teoria"].apply(formatar_tempo)
+            tab_v["Teoria"] = tab_v["Teoria Novo"].apply(formatar_tempo)
             tab_v["Rev."] = tab_v["Revisão"].apply(formatar_tempo)
             tab_v["Ques. (Tempo)"] = tab_v["Questões"].apply(formatar_tempo)
             
@@ -332,7 +325,7 @@ if page == "Home":
 
             # 3. Gráfico 2: Desempenho Geral (Texto Fixo %)
             st.subheader("Desempenho Geral (7 Dias)")
-            fig_desempenho = px.line(evol, x='data_label', y='perc_acerto', markers=True, text='perc_acerto', color_discrete_sequence=['#3ec6a8'])
+            fig_desempenho = px.line(evol, x='data_label', y='perc_acerto', markers=True, text='perc_acerto', color_discrete_sequence=['#ffffff'])
             fig_desempenho.update_traces(textposition="top center", texttemplate='%{text}%')
             fig_desempenho.add_hline(y=90, line_dash="dash", line_color="#4f4f4f", annotation_text="Meta 90%")
             fig_desempenho.update_layout(
@@ -349,15 +342,15 @@ elif page == "Registrar Estudo":
         col1, col2, col3 = st.columns(3)
         with col1:
             materia = st.selectbox("Matéria", materias_list)
-            tipo = st.selectbox("Tipo", ["Questões", "Revisão", "Teoria"])
+            tipo = st.selectbox("Tipo", ["Teoria Novo", "Revisão", "Questões"])
         with col2:
             tempo = st.number_input("Tempo total (min)", 0)
             humor = st.selectbox("Humor/Energia", ["Focado ⚡", "Neutro 😐", "Cansado 😴"])
         with col3:
             # NOVO CAMPO: Dia do Cronograma
-            dia_crono = st.selectbox("Dia", [1, 2, 3, 4, 5, 6, 7], help="Indique qual dia do seu cronograma de 7 dias você está executando agora.")
+            dia_crono = st.selectbox("Dia do Ciclo Estudado", [1, 2, 3, 4, 5, 6, 7], help="Indique qual dia do seu cronograma de 7 dias você está executando agora.")
             # NOVO CAMPO: Atualizar o Giro do Ciclo
-            giro_informado = st.number_input("Giro Atual", min_value=1, step=1, value=1, help="Informe em qual giro você está para atualizar automaticamente a tabela do cronograma.")
+            giro_informado = st.number_input("Giro Atual (Atualiza o Dashboard)", min_value=1, step=1, value=1, help="Informe em qual giro você está para atualizar automaticamente a tabela do cronograma.")
         
         st.divider()
         st.markdown("📖 **Leitura de Páginas**")
@@ -379,7 +372,14 @@ elif page == "Registrar Estudo":
                 # O índice da tabela reflete o dia selecionado (1 equivale ao índice 0, etc.)
                 idx = dia_crono - 1
                 if idx < len(df_cronograma):
-                    df_cronograma.at[idx, 'giros'] = giro_informado
+                    # Procura em qual bloco a matéria se encontra para atualizar o giro correspondente
+                    if str(df_cronograma.at[idx, 'disciplina 01']).strip() == materia:
+                        df_cronograma.at[idx, 'giros'] = giro_informado
+                    elif str(df_cronograma.at[idx, 'disciplina 02']).strip() == materia:
+                        df_cronograma.at[idx, 'giros_2'] = giro_informado
+                    elif str(df_cronograma.at[idx, 'disciplina 03']).strip() == materia:
+                        df_cronograma.at[idx, 'giros_3'] = giro_informado
+                        
                     overwrite_data("cronograma", df_cronograma)
             
             novo_dado = pd.DataFrame([{
@@ -533,11 +533,13 @@ elif page == "Ciclo de Estudos":
         "ordem": st.column_config.TextColumn("Sequência", disabled=True),
         "disciplina 01": st.column_config.SelectboxColumn("Materia 01", options=materias_list),
         "tempo d1 (h)": st.column_config.NumberColumn("H. D1", format="%.2f h"),
-        "giros": st.column_config.NumberColumn("🌀 Giro"),
+        "giros": st.column_config.NumberColumn("🌀 Giro 1"),
         "disciplina 02": st.column_config.SelectboxColumn("Materia 02", options=materias_list),
         "tempo d2 (h)": st.column_config.NumberColumn("H. D2", format="%.2f h"),
+        "giros_2": st.column_config.NumberColumn("🌀 Giro 2"),
         "disciplina 03": st.column_config.SelectboxColumn("Materia 03", options=materias_list),
         "tempo d3 (h)": st.column_config.NumberColumn("H. D3", format="%.2f h"),
+        "giros_3": st.column_config.NumberColumn("🌀 Giro 3"),
         "total dia (h)": st.column_config.NumberColumn("Total Dia", format="%.2f h", disabled=True)
     }
 
@@ -556,14 +558,18 @@ elif page == "Ciclo de Estudos":
     st.write("---")
     st.subheader("🖼️ Visualização do Cronograma Salvo")
     
-    html_tabela = """<table style="width:100%; border-collapse: collapse; background-color: #3a3b3c; color: white; border-radius: 10px; overflow: hidden; border: 1px solid #4f4f4f;"><thead><tr style="background-color: #202225; color: #3ec6a8; text-align: left;"><th style="padding: 12px; border: 1px solid #4f4f4f;">Sequência</th><th style="padding: 12px; border: 1px solid #4f4f4f;">Matéria 01</th><th style="padding: 12px; border: 1px solid #4f4f4f; text-align: center;">🌀 Giro</th><th style="padding: 12px; border: 1px solid #4f4f4f;">Matéria 02</th><th style="padding: 12px; border: 1px solid #4f4f4f;">Matéria 03</th><th style="padding: 12px; border: 1px solid #4f4f4f; background-color: #2b2d2e; text-align: center;">Total Dia</th></tr></thead><tbody>"""
+    html_tabela = """<table style="width:100%; border-collapse: collapse; background-color: #3a3b3c; color: white; border-radius: 10px; overflow: hidden; border: 1px solid #4f4f4f;"><thead><tr style="background-color: #202225; color: #3ec6a8; text-align: left;"><th style="padding: 12px; border: 1px solid #4f4f4f;">Sequência</th><th style="padding: 12px; border: 1px solid #4f4f4f;">Matéria 01</th><th style="padding: 12px; border: 1px solid #4f4f4f; text-align: center;">🌀 Giro 1</th><th style="padding: 12px; border: 1px solid #4f4f4f;">Matéria 02</th><th style="padding: 12px; border: 1px solid #4f4f4f; text-align: center;">🌀 Giro 2</th><th style="padding: 12px; border: 1px solid #4f4f4f;">Matéria 03</th><th style="padding: 12px; border: 1px solid #4f4f4f; text-align: center;">🌀 Giro 3</th><th style="padding: 12px; border: 1px solid #4f4f4f; background-color: #2b2d2e; text-align: center;">Total Dia</th></tr></thead><tbody>"""
     
     for _, row in df_cronograma.iterrows():
         m1, m2, m3 = [str(row.get(f'disciplina 0{i}', '-')) for i in range(1, 4)]
         t1, t2, t3 = [f"{row.get(f'tempo d{i} (h)', 0):.2f}h" if x != '-' and x != 'nan' else "" for i, x in enumerate([m1, m2, m3], 1)]
         total_dia = f"{row.get('total dia (h)', 0):.2f}h"
+        
+        g1 = int(row.get('giros', 1)) if pd.notna(row.get('giros')) else 1
+        g2 = int(row.get('giros_2', 1)) if pd.notna(row.get('giros_2')) else 1
+        g3 = int(row.get('giros_3', 1)) if pd.notna(row.get('giros_3')) else 1
 
-        html_tabela += f"""<tr style="border-bottom: 1px solid #4f4f4f;"><td style="padding: 10px; border: 1px solid #4f4f4f; font-weight: bold; background: #2b2d2e; text-align: center;">{row['ordem']}</td><td style="padding: 10px; border: 1px solid #4f4f4f;">{m1 if m1 != 'nan' else '-'} <br><small style='color:#3ec6a8'>{t1}</small></td><td style="padding: 10px; border: 1px solid #4f4f4f; text-align: center;">{int(row.get('giros', 1))}</td><td style="padding: 10px; border: 1px solid #4f4f4f;">{m2 if m2 != 'nan' else '-'} <br><small style='color:#3ec6a8'>{t2}</small></td><td style="padding: 10px; border: 1px solid #4f4f4f;">{m3 if m3 != 'nan' else '-'} <br><small style='color:#3ec6a8'>{t3}</small></td><td style="padding: 10px; border: 1px solid #4f4f4f; font-weight: bold; color: #3ec6a8; background: #2b2d2e; text-align: center;">{total_dia}</td></tr>"""
+        html_tabela += f"""<tr style="border-bottom: 1px solid #4f4f4f;"><td style="padding: 10px; border: 1px solid #4f4f4f; font-weight: bold; background: #2b2d2e; text-align: center;">{row['ordem']}</td><td style="padding: 10px; border: 1px solid #4f4f4f;">{m1 if m1 != 'nan' else '-'} <br><small style='color:#3ec6a8'>{t1}</small></td><td style="padding: 10px; border: 1px solid #4f4f4f; text-align: center;">{g1 if m1 != '-' and m1 != 'nan' else '-'}</td><td style="padding: 10px; border: 1px solid #4f4f4f;">{m2 if m2 != 'nan' else '-'} <br><small style='color:#3ec6a8'>{t2}</small></td><td style="padding: 10px; border: 1px solid #4f4f4f; text-align: center;">{g2 if m2 != '-' and m2 != 'nan' else '-'}</td><td style="padding: 10px; border: 1px solid #4f4f4f;">{m3 if m3 != 'nan' else '-'} <br><small style='color:#3ec6a8'>{t3}</small></td><td style="padding: 10px; border: 1px solid #4f4f4f; text-align: center;">{g3 if m3 != '-' and m3 != 'nan' else '-'}</td><td style="padding: 10px; border: 1px solid #4f4f4f; font-weight: bold; color: #3ec6a8; background: #2b2d2e; text-align: center;">{total_dia}</td></tr>"""
     
     st.markdown(html_tabela + "</tbody></table>", unsafe_allow_html=True)
 
