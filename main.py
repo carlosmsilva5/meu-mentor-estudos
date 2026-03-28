@@ -111,15 +111,50 @@ df_erros = load_data("caderno_erros")
 df_config = load_data("config")
 df_cronograma = load_data("cronograma")
 
-# Se o cronograma estiver vazio (primeiro acesso), cria uma estrutura padrão
+# Se o cronograma estiver vazio (primeiro acesso), cria uma estrutura padrão corrigida
 if df_cronograma.empty:
     df_cronograma = pd.DataFrame({
-        "dia": [1, 2, 3, 4, 5, 6, 7],
-        "materia_1": ["Português", "Dir. Constitucional", "Dir. Administrativo", "Português", "Dir. Constitucional", "Revisão Geral", "Simulado"],
-        "materia_2": ["Raciocínio Lógico", "Informática", "Redação", "Raciocínio Lógico", "Informática", "Discursiva", "-"],
-        "materia_3": ["-", "-", "-", "-", "-", "-", "-"]
+        "ordem": [1, 2, 3, 4, 5, 6, 7],
+        "disciplina 01": ["Português", "Dir. Constitucional", "Dir. Administrativo", "Português", "Dir. Constitucional", "Revisão Geral", "Simulado"],
+        "tempo d1 (h)": [0.0] * 7,
+        "giros": [1] * 7,
+        "disciplina 02": ["Raciocínio Lógico", "Informática", "Redação", "Raciocínio Lógico", "Informática", "Discursiva", "-"],
+        "tempo d2 (h)": [0.0] * 7,
+        "giros_2": [1] * 7,
+        "disciplina 03": ["-", "-", "-", "-", "-", "-", "-"],
+        "tempo d3 (h)": [0.0] * 7,
+        "giros_3": [1] * 7,
+        "total dia (h)": [0.0] * 7
     })
     overwrite_data("cronograma", df_cronograma)
+else:
+    # GARANTIA GLOBAL: Corrige planilhas antigas e força conversão numérica
+    colunas_padrao = {
+        "ordem": [1, 2, 3, 4, 5, 6, 7],
+        "disciplina 01": "-", "tempo d1 (h)": 0.0, "giros": 1,
+        "disciplina 02": "-", "tempo d2 (h)": 0.0, "giros_2": 1,
+        "disciplina 03": "-", "tempo d3 (h)": 0.0, "giros_3": 1,
+        "total dia (h)": 0.0
+    }
+    precisa_salvar = False
+    for col, default in colunas_padrao.items():
+        if col not in df_cronograma.columns:
+            # Aproveita dados se a planilha usar nomes antigos (materia_1, dia, etc)
+            if col == "ordem" and "dia" in df_cronograma.columns: df_cronograma[col] = df_cronograma["dia"]
+            elif col == "disciplina 01" and "materia_1" in df_cronograma.columns: df_cronograma[col] = df_cronograma["materia_1"]
+            elif col == "disciplina 02" and "materia_2" in df_cronograma.columns: df_cronograma[col] = df_cronograma["materia_2"]
+            elif col == "disciplina 03" and "materia_3" in df_cronograma.columns: df_cronograma[col] = df_cronograma["materia_3"]
+            else: df_cronograma[col] = default
+            precisa_salvar = True
+            
+    # Força as colunas de tempo a serem números float (evita quebra na tabela HTML do Dashboard)
+    for i in range(1, 4):
+        col_t = f"tempo d{i} (h)"
+        if col_t in df_cronograma.columns:
+            df_cronograma[col_t] = pd.to_numeric(df_cronograma[col_t], errors='coerce').fillna(0.0)
+            
+    if precisa_salvar:
+        overwrite_data("cronograma", df_cronograma)
 
 materias_list = str(df_config["materias"].iloc[0]).split(",") if not df_config.empty and "materias" in df_config.columns else ["Português", "Direito Constitucional", "Direito Administrativo"]
 
@@ -294,7 +329,7 @@ if page == "Home":
             )
 
         with col_grafico2:
-            # 1. Preparação dos Dados (7 dias)
+            # 1. Preparação Dados (7 dias)
             hoje = pd.Timestamp.today().normalize()
             df_dias = pd.DataFrame({'data': pd.date_range(end=hoje, periods=7)})
             df_estudo['data_fmt'] = pd.to_datetime(df_estudo['data'], format='%d/%m/%Y', errors='coerce')
@@ -544,10 +579,16 @@ elif page == "Ciclo de Estudos":
     ed_ciclo = st.data_editor(df_cronograma, num_rows="fixed", use_container_width=True, hide_index=True, column_config=config_crono, key="ed_ciclo_final_fix")
 
     if st.button("💾 Salvar e Aplicar Ciclo", type="primary", use_container_width=True):
-        ed_ciclo["total dia (h)"] = ed_ciclo["tempo d1 (h)"].fillna(0) + ed_ciclo["tempo d2 (h)"].fillna(0) + ed_ciclo["tempo d3 (h)"].fillna(0)
+        # Converte tudo para numérico antes de somar para evitar erro oculto de concatenação de string
+        for i in range(1, 4):
+            ed_ciclo[f"tempo d{i} (h)"] = pd.to_numeric(ed_ciclo[f"tempo d{i} (h)"], errors='coerce').fillna(0.0)
+            
+        ed_ciclo["total dia (h)"] = ed_ciclo["tempo d1 (h)"] + ed_ciclo["tempo d2 (h)"] + ed_ciclo["tempo d3 (h)"]
+        
         # Salva em minutos para compatibilidade com o Dashboard
         for i in range(1, 4):
             ed_ciclo[f"tempo d{i} (min)"] = (ed_ciclo[f"tempo d{i} (h)"] * 60).astype(int)
+            
         overwrite_data("cronograma", ed_ciclo)
         st.success("✅ Ciclo atualizado e salvo!")
         st.rerun()
