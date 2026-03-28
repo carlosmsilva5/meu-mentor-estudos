@@ -349,7 +349,7 @@ elif page == "Registrar Estudo":
         col1, col2, col3 = st.columns(3)
         with col1:
             materia = st.selectbox("Matéria", materias_list)
-            tipo = st.selectbox("Tipo", ["Teoria Novo", "Revisão", "Questões"])
+            tipo = st.selectbox("Tipo", ["Questões", "Revisão", "Teoria"])
         with col2:
             tempo = st.number_input("Tempo total (min)", 0)
             humor = st.selectbox("Humor/Energia", ["Focado ⚡", "Neutro 😐", "Cansado 😴"])
