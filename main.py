@@ -268,7 +268,7 @@ if page == "Home":
             
             # Formatação de Tempos
             tab_v["Total"] = tab_v["tempo_total"].apply(formatar_tempo)
-            tab_v["Teoria"] = tab_v["Teoria Novo"].apply(formatar_tempo)
+            tab_v["Teoria"] = tab_v["Teoria"].apply(formatar_tempo)
             tab_v["Rev."] = tab_v["Revisão"].apply(formatar_tempo)
             tab_v["Ques. (Tempo)"] = tab_v["Questões"].apply(formatar_tempo)
             
