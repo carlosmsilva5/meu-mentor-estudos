@@ -165,6 +165,23 @@ if page == "Home":
 
     st.divider()
 
+    # --- NOVO BLOCO: CRONOGRAMA DE ESTUDOS NO DASHBOARD ---
+    st.subheader("🗓️ Cronograma Atual")
+    
+    html_tabela_home = """<table style="width:100%; border-collapse: collapse; background-color: #3a3b3c; color: white; border-radius: 10px; overflow: hidden; border: 1px solid #4f4f4f;"><thead><tr style="background-color: #202225; color: #3ec6a8; text-align: left;"><th style="padding: 12px; border: 1px solid #4f4f4f;">Sequência</th><th style="padding: 12px; border: 1px solid #4f4f4f;">Matéria 01</th><th style="padding: 12px; border: 1px solid #4f4f4f; text-align: center;">🌀 Giro</th><th style="padding: 12px; border: 1px solid #4f4f4f;">Matéria 02</th><th style="padding: 12px; border: 1px solid #4f4f4f;">Matéria 03</th><th style="padding: 12px; border: 1px solid #4f4f4f; background-color: #2b2d2e; text-align: center;">Total Dia</th></tr></thead><tbody>"""
+    
+    for _, row in df_cronograma.iterrows():
+        m1, m2, m3 = [str(row.get(f'disciplina 0{i}', '-')) for i in range(1, 4)]
+        t1, t2, t3 = [f"{row.get(f'tempo d{i} (h)', 0):.2f}h" if x != '-' and x != 'nan' else "" for i, x in enumerate([m1, m2, m3], 1)]
+        total_dia = f"{row.get('total dia (h)', 0):.2f}h"
+        ordem_v = row.get('ordem', '-')
+
+        html_tabela_home += f"""<tr style="border-bottom: 1px solid #4f4f4f;"><td style="padding: 10px; border: 1px solid #4f4f4f; font-weight: bold; background: #2b2d2e; text-align: center;">{ordem_v}</td><td style="padding: 10px; border: 1px solid #4f4f4f;">{m1 if m1 != 'nan' else '-'} <br><small style='color:#3ec6a8'>{t1}</small></td><td style="padding: 10px; border: 1px solid #4f4f4f; text-align: center;">{int(row.get('giros', 1)) if pd.notna(row.get('giros')) else 1}</td><td style="padding: 10px; border: 1px solid #4f4f4f;">{m2 if m2 != 'nan' else '-'} <br><small style='color:#3ec6a8'>{t2}</small></td><td style="padding: 10px; border: 1px solid #4f4f4f;">{m3 if m3 != 'nan' else '-'} <br><small style='color:#3ec6a8'>{t3}</small></td><td style="padding: 10px; border: 1px solid #4f4f4f; font-weight: bold; color: #3ec6a8; background: #2b2d2e; text-align: center;">{total_dia}</td></tr>"""
+    
+    st.markdown(html_tabela_home + "</tbody></table>", unsafe_allow_html=True)
+    st.divider()
+    # --- FIM DO NOVO BLOCO ---
+
     if not df_estudo.empty:
         col_grafico1, col_grafico2 = st.columns(2)
         
