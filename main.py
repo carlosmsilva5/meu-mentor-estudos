@@ -245,11 +245,7 @@ if page == "Home":
                         gridcolor='#4f4f4f',
                         showticklabels=False  # <--- ISSO REMOVE OS NÚMEROS INTERNOS
                     ),
-                    angularaxis=dict(
-                        color='white', 
-                        gridcolor='#4f4f4f',
-                        dtick=1  # <--- FORÇA O PLOTLY A MOSTRAR TODOS OS RÓTULOS, INDEPENDENTE DO TAMANHO
-                    )
+                    angularaxis=dict(color='white', gridcolor='#4f4f4f')
                 ),
                 paper_bgcolor='rgba(0,0,0,0)', 
                 plot_bgcolor='rgba(0,0,0,0)', 
