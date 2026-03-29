@@ -342,7 +342,7 @@ elif page == "Registrar Estudo":
             tipo = st.selectbox("Tipo", ["Questões", "Revisão", "Teoria"])
         with col2:
             tempo = st.number_input("Tempo total (min)", 0)
-            humor = st.selectbox("Humor/Energia", ["Focado ⚡", "Neutro 😐", "Cansado 😴"])
+            humor = st.selectbox("Humor/Energia", ["Neutro 😐", "Focado ⚡", "Cansado 😴"])
         with col3:
             # NOVO CAMPO: Dia do Cronograma
             dia_crono = st.selectbox("Dia do Ciclo", [1, 2, 3, 4, 5, 6, 7], help="Indique qual dia do seu cronograma de 7 dias você está executando agora.")
