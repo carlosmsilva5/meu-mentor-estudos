@@ -210,7 +210,14 @@ if page == "Home":
             painel_completo = pd.merge(painel_disc, df_tipos, on="materia", how="left")
             
             # --- RECUPERAÇÃO DO GRÁFICO RADAR (ESTILO PREMIUM MANTIDO) ---
+            import textwrap
+            
             painel_completo["aproveitamento"] = (painel_completo["q_acertos"] / painel_completo["q_total"] * 100).fillna(0)
+            
+            # Cria um novo rótulo juntando o nome da matéria (quebrado se for longo) e o percentual acumulado
+            painel_completo["materia_label"] = painel_completo.apply(
+                lambda row: f"{'<br>'.join(textwrap.wrap(str(row['materia']), width=22))}<br>{row['aproveitamento']:.1f}%", axis=1
+            )
             
             # 1. Definir a cor dinâmica baseada na média de aproveitamento
             media_aprov = painel_completo["aproveitamento"].mean()
@@ -223,7 +230,7 @@ if page == "Home":
             fig_radar = px.line_polar(
                 painel_completo, 
                 r='aproveitamento', 
-                theta='materia', 
+                theta='materia_label',  # <--- AGORA USA O RÓTULO COM O PERCENTUAL 
                 line_close=True,
                 markers=True,
                 color_discrete_sequence=[cor_radar]
@@ -242,12 +249,16 @@ if page == "Home":
                         gridcolor='#4f4f4f',
                         showticklabels=False  # <--- ISSO REMOVE OS NÚMEROS INTERNOS
                     ),
-                    angularaxis=dict(color='white', gridcolor='#4f4f4f')
+                    angularaxis=dict(
+                        color='white', 
+                        gridcolor='#4f4f4f',
+                        dtick=1 # <--- Força exibir todos os nomes
+                    )
                 ),
                 paper_bgcolor='rgba(0,0,0,0)', 
                 plot_bgcolor='rgba(0,0,0,0)', 
                 font=dict(color='white'),
-                margin=dict(l=40, r=40, t=20, b=20)
+                margin=dict(l=70, r=70, t=50, b=50) # Margens ajustadas para não cortar os rótulos longos
             )
             st.plotly_chart(fig_radar, use_container_width=True, config={'staticPlot': True})
             # -------------------------------------------------------------
