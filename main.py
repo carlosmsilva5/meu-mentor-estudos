@@ -366,17 +366,16 @@ elif page == "Registrar Estudo":
             
             # --- ATUALIZAÇÃO DO GIRO NO CRONOGRAMA ---
             if not df_cronograma.empty:
-                # O índice da tabela reflete o dia selecionado (1 equivale ao índice 0, etc.)
-                idx = dia_crono - 1
-                if idx < len(df_cronograma):
-                    # Procura em qual bloco a matéria se encontra para atualizar o giro correspondente
-                    if str(df_cronograma.at[idx, 'disciplina 01']).strip() == materia:
-                        df_cronograma.at[idx, 'giros'] = giro_informado
-                    elif str(df_cronograma.at[idx, 'disciplina 02']).strip() == materia:
-                        df_cronograma.at[idx, 'giros_2'] = giro_informado
-                    elif str(df_cronograma.at[idx, 'disciplina 03']).strip() == materia:
-                        df_cronograma.at[idx, 'giros_3'] = giro_informado
-                        
+                pos = dia_crono - 1
+                if pos < len(df_cronograma):
+                    # Garante que a coluna existe
+                    if 'giros' not in df_cronograma.columns:
+                        df_cronograma['giros'] = 1
+                    
+                    # Pega o índice real da linha correspondente ao dia e atualiza o giro
+                    real_idx = df_cronograma.index[pos]
+                    df_cronograma.at[real_idx, 'giros'] = giro_informado
+                    
                     overwrite_data("cronograma", df_cronograma)
             
             novo_dado = pd.DataFrame([{
