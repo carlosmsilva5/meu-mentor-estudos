@@ -168,7 +168,7 @@ if page == "Home":
     # --- NOVO BLOCO: CRONOGRAMA DE ESTUDOS NO DASHBOARD ---
     st.subheader("🗓️ Cronograma Atual")
     
-    html_tabela_home = """<table style="width:100%; border-collapse: collapse; background-color: #3a3b3c; color: white; border-radius: 10px; overflow: hidden; border: 1px solid #4f4f4f;"><thead><tr style="background-color: #202225; color: #3ec6a8; text-align: left;"><th style="padding: 12px; border: 1px solid #4f4f4f;">Sequência</th><th style="padding: 12px; border: 1px solid #4f4f4f;">Matéria 01</th><th style="padding: 12px; border: 1px solid #4f4f4f; text-align: center;">🌀 Giro</th><th style="padding: 12px; border: 1px solid #4f4f4f;">Matéria 02</th><th style="padding: 12px; border: 1px solid #4f4f4f;">Matéria 03</th><th style="padding: 12px; border: 1px solid #4f4f4f; background-color: #2b2d2e; text-align: center;">Total Dia</th></tr></thead><tbody>"""
+    html_tabela_home = """<table style="width:100%; border-collapse: collapse; background-color: #3a3b3c; color: white; border-radius: 10px; overflow: hidden; border: 1px solid #4f4f4f;"><thead><tr style="background-color: #202225; color: #3ec6a8; text-align: left;"><th style="padding: 12px; border: 1px solid #4f4f4f;">Dia do Ciclo</th><th style="padding: 12px; border: 1px solid #4f4f4f;">Matéria 01</th><th style="padding: 12px; border: 1px solid #4f4f4f; text-align: center;">🌀 Giro</th><th style="padding: 12px; border: 1px solid #4f4f4f;">Matéria 02</th><th style="padding: 12px; border: 1px solid #4f4f4f;">Matéria 03</th><th style="padding: 12px; border: 1px solid #4f4f4f; background-color: #2b2d2e; text-align: center;">Total Dia</th></tr></thead><tbody>"""
     
     for _, row in df_cronograma.iterrows():
         m1, m2, m3 = [str(row.get(f'disciplina 0{i}', '-')) for i in range(1, 4)]
@@ -202,7 +202,7 @@ if page == "Home":
             
             # Divisão de Tempo por Tipo
             df_tipos = df_estudo.groupby(["materia", "tipo_estudo"])["tempo_num"].sum().unstack(fill_value=0).reset_index()
-            for t in ["Teoria Novo", "Revisão", "Questões"]:
+            for t in ["Teoria", "Revisão", "Questões"]:
                 if t not in df_tipos.columns: df_tipos[t] = 0
             
             painel_completo = pd.merge(painel_disc, df_tipos, on="materia", how="left")
@@ -256,7 +256,7 @@ if page == "Home":
             
             # Formatação de Tempos
             tab_v["Total"] = tab_v["tempo_total"].apply(formatar_tempo)
-            tab_v["Teoria"] = tab_v["Teoria Novo"].apply(formatar_tempo)
+            tab_v["Teoria"] = tab_v["Teoria"].apply(formatar_tempo)
             tab_v["Rev."] = tab_v["Revisão"].apply(formatar_tempo)
             tab_v["Ques. (Tempo)"] = tab_v["Questões"].apply(formatar_tempo)
             
@@ -337,15 +337,21 @@ elif page == "Registrar Estudo":
         col1, col2, col3 = st.columns(3)
         with col1:
             materia = st.selectbox("Matéria", materias_list)
-            tipo = st.selectbox("Tipo", ["Teoria Novo", "Revisão", "Questões"])
+            tipo = st.selectbox("Tipo", ["Questões", "Revisão", "Teoria"])
         with col2:
             tempo = st.number_input("Tempo total (min)", 0)
             humor = st.selectbox("Humor/Energia", ["Focado ⚡", "Neutro 😐", "Cansado 😴"])
         with col3:
             # NOVO CAMPO: Dia do Cronograma
-            dia_crono = st.selectbox("Dia do Ciclo Estudado", [1, 2, 3, 4, 5, 6, 7], help="Indique qual dia do seu cronograma de 7 dias você está executando agora.")
+            dia_crono = st.selectbox("Dia do Ciclo", [1, 2, 3, 4, 5, 6, 7], help="Indique qual dia do seu cronograma de 7 dias você está executando agora.")
             # NOVO CAMPO: Atualizar o Giro do Ciclo
-            giro_informado = st.number_input("Giro Atual (Atualiza o Dashboard)", min_value=1, step=1, value=1, help="Informe em qual giro você está para atualizar automaticamente a tabela do cronograma.")
+            giro_informado = st.number_input("Giro Atual", min_value=1, step=1, value=1, help="Informe em qual giro você está para atualizar automaticamente a tabela do cronograma.")
+        
+        st.divider()
+        st.markdown("📝 **Questões**")
+        cq1, cq2 = st.columns(2)
+        q_t = cq1.number_input("Qtd Questões", 0)
+        q_a = cq2.number_input("Acertos", 0)
         
         st.divider()
         st.markdown("📖 **Leitura de Páginas**")
@@ -353,11 +359,7 @@ elif page == "Registrar Estudo":
         p_inicio = p1.number_input("Página Inicial", 0)
         p_fim = p2.number_input("Página Final", 0)
         
-        st.divider()
-        st.markdown("📝 **Questões**")
-        cq1, cq2 = st.columns(2)
-        q_t = cq1.number_input("Qtd Questões", 0)
-        q_a = cq2.number_input("Acertos", 0)
+        
         
         if st.form_submit_button("Salvar Registro"):
             total_paginas = (p_fim - p_inicio) + 1 if p_fim >= p_inicio and p_fim > 0 else 0
@@ -551,7 +553,7 @@ elif page == "Ciclo de Estudos":
     st.write("---")
     st.subheader("🖼️ Visualização do Cronograma Salvo")
     
-    html_tabela = """<table style="width:100%; border-collapse: collapse; background-color: #3a3b3c; color: white; border-radius: 10px; overflow: hidden; border: 1px solid #4f4f4f;"><thead><tr style="background-color: #202225; color: #3ec6a8; text-align: left;"><th style="padding: 12px; border: 1px solid #4f4f4f;">Sequência</th><th style="padding: 12px; border: 1px solid #4f4f4f;">Matéria 01</th><th style="padding: 12px; border: 1px solid #4f4f4f; text-align: center;">🌀 Giro</th><th style="padding: 12px; border: 1px solid #4f4f4f;">Matéria 02</th><th style="padding: 12px; border: 1px solid #4f4f4f;">Matéria 03</th><th style="padding: 12px; border: 1px solid #4f4f4f; background-color: #2b2d2e; text-align: center;">Total Dia</th></tr></thead><tbody>"""
+    html_tabela = """<table style="width:100%; border-collapse: collapse; background-color: #3a3b3c; color: white; border-radius: 10px; overflow: hidden; border: 1px solid #4f4f4f;"><thead><tr style="background-color: #202225; color: #3ec6a8; text-align: left;"><th style="padding: 12px; border: 1px solid #4f4f4f;">Dia do Ciclo</th><th style="padding: 12px; border: 1px solid #4f4f4f;">Matéria 01</th><th style="padding: 12px; border: 1px solid #4f4f4f; text-align: center;">🌀 Giro</th><th style="padding: 12px; border: 1px solid #4f4f4f;">Matéria 02</th><th style="padding: 12px; border: 1px solid #4f4f4f;">Matéria 03</th><th style="padding: 12px; border: 1px solid #4f4f4f; background-color: #2b2d2e; text-align: center;">Total Dia</th></tr></thead><tbody>"""
     
     for _, row in df_cronograma.iterrows():
         m1, m2, m3 = [str(row.get(f'disciplina 0{i}', '-')) for i in range(1, 4)]
