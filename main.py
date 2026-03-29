@@ -213,7 +213,6 @@ if page == "Home":
             
             # --- RECUPERAÇÃO DO GRÁFICO RADAR (ESTILO PREMIUM MANTIDO) ---
             painel_completo["aproveitamento"] = (painel_completo["q_acertos"] / painel_completo["q_total"] * 100).fillna(0)
-            painel_completo["materia_label"] = painel_completo.apply(lambda row: f"{row['materia']}<br>{row['aproveitamento']:.1f}%", axis=1)
             
             # 1. Definir a cor dinâmica baseada na média de aproveitamento
             media_aprov = painel_completo["aproveitamento"].mean()
@@ -226,7 +225,7 @@ if page == "Home":
             fig_radar = px.line_polar(
                 painel_completo, 
                 r='aproveitamento', 
-                theta='materia_label', 
+                theta='materia', 
                 line_close=True,
                 markers=True,
                 color_discrete_sequence=[cor_radar]
