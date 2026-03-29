@@ -125,7 +125,7 @@ materias_list = str(df_config["materias"].iloc[0]).split(",") if not df_config.e
 
 # ---------------- SIDEBAR ----------------
 with st.sidebar:
-    st.title("📘 Mentor Elite")
+    st.title("📘 Estudômetro")
     menu_map = {
         "🏠 Dashboard": "Home",
         "⏱️ Registrar": "Registrar Estudo",
