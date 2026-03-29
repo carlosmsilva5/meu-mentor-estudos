@@ -344,6 +344,8 @@ elif page == "Registrar Estudo":
         with col3:
             # NOVO CAMPO: Dia do Cronograma
             dia_crono = st.selectbox("Dia do Ciclo Estudado", [1, 2, 3, 4, 5, 6, 7], help="Indique qual dia do seu cronograma de 7 dias você está executando agora.")
+            # NOVO CAMPO: Atualizar o Giro do Ciclo
+            giro_informado = st.number_input("Giro Atual (Atualiza o Dashboard)", min_value=1, step=1, value=1, help="Informe em qual giro você está para atualizar automaticamente a tabela do cronograma.")
         
         st.divider()
         st.markdown("📖 **Leitura de Páginas**")
@@ -360,6 +362,21 @@ elif page == "Registrar Estudo":
         if st.form_submit_button("Salvar Registro"):
             total_paginas = (p_fim - p_inicio) + 1 if p_fim >= p_inicio and p_fim > 0 else 0
             
+            # --- ATUALIZAÇÃO DO GIRO NO CRONOGRAMA ---
+            if not df_cronograma.empty:
+                # O índice da tabela reflete o dia selecionado (1 equivale ao índice 0, etc.)
+                idx = dia_crono - 1
+                if idx < len(df_cronograma):
+                    # Procura em qual bloco a matéria se encontra para atualizar o giro correspondente
+                    if str(df_cronograma.at[idx, 'disciplina 01']).strip() == materia:
+                        df_cronograma.at[idx, 'giros'] = giro_informado
+                    elif str(df_cronograma.at[idx, 'disciplina 02']).strip() == materia:
+                        df_cronograma.at[idx, 'giros_2'] = giro_informado
+                    elif str(df_cronograma.at[idx, 'disciplina 03']).strip() == materia:
+                        df_cronograma.at[idx, 'giros_3'] = giro_informado
+                        
+                    overwrite_data("cronograma", df_cronograma)
+            
             novo_dado = pd.DataFrame([{
                 "data": datetime.now().strftime("%d/%m/%Y"), 
                 "materia": materia, 
@@ -373,7 +390,7 @@ elif page == "Registrar Estudo":
             }])
             
             save_data("progresso", novo_dado)
-            st.success(f"Estudo do Dia {dia_crono:02d} salvo! {total_paginas} páginas contabilizadas.")
+            st.success(f"Estudo do Dia {dia_crono:02d} salvo e Giro {giro_informado} atualizado no painel! {total_paginas} páginas contabilizadas.")
             st.rerun()
 
 elif page == "Caderno de Erros":
